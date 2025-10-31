@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
-from code_dump.archiver import extract_group_prefix, _safe_arcname, ArchiveManager
+from create_dump.archiver import extract_group_prefix, _safe_arcname, ArchiveManager
 
 
 @pytest.mark.parametrize(
@@ -62,7 +62,7 @@ def test_extract_timestamp_valid(filename, expected):
     ],
 )
 def test_extract_timestamp_no_match(filename):
-    with patch('code_dump.archiver.logger.warning') as mock_warn:
+    with patch('create_dump.archiver.logger.warning') as mock_warn:
         ts = ArchiveManager.extract_timestamp(filename)
         assert ts == datetime.min
         mock_warn.assert_not_called()  # Silent fallback, no warn
@@ -76,7 +76,7 @@ def test_extract_timestamp_no_match(filename):
     ],
 )
 def test_extract_timestamp_bad_parse(filename):
-    with patch('code_dump.archiver.logger.warning') as mock_warn:
+    with patch('create_dump.archiver.logger.warning') as mock_warn:
         ts = ArchiveManager.extract_timestamp(filename)
         assert ts == datetime.min
         mock_warn.assert_called_once_with("Malformed timestamp in filename: %s", filename)

@@ -1,4 +1,4 @@
-# src/code_dump/utils.py
+# src/create_dump/utils.py
 """
 Shared utilities: Logging, metrics, helpers.
 
@@ -27,7 +27,7 @@ from pathspec.patterns.gitwildmatch import GitWildMatchPatternError
 from prometheus_client import Counter, Histogram, start_http_server
 
 # Define logger EARLY to avoid circular imports
-logger = structlog.get_logger("code_dump")
+logger = structlog.get_logger("create_dump")
 
 # NOW import core (after logger is defined)
 from .core import Config, GitMeta

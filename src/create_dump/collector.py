@@ -1,4 +1,4 @@
-# src/code_dump/collector.py
+# src/create_dump/collector.py
 """
 File collection logic.
 

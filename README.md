@@ -1,16 +1,16 @@
 ---
 
-# code-dump
+# create-dump
 
-[![PyPI Version](https://badge.fury.io/py/code-dump.svg)](https://badge.fury.io/py/code-dump)
+[![PyPI Version](https://badge.fury.io/py/create-dump.svg)](https://badge.fury.io/py/create-dump)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://github.com/dhruv/code-dump/actions/workflows/ci.yml/badge.svg)](https://github.com/dhruv/code-dump/actions)
-[![Coverage](https://img.shields.io/badge/coverage-93%25-brightgreen.svg)](https://codecov.io/gh/dhruv/code-dump)
+[![Tests](https://github.com/dhruv/create-dump/actions/workflows/ci.yml/badge.svg)](https://github.com/dhruv/create-dump/actions)
+[![Coverage](https://img.shields.io/badge/coverage-93%25-brightgreen.svg)](https://codecov.io/gh/dhruv/create-dump)
 
 **Enterprise-Grade Code Dump Utility for Monorepos**
 
-`code-dump` is a robust, production-ready CLI tool designed for automated code archival in large-scale monorepos. It generates branded Markdown dumps with embedded Git metadata, integrity checksums, and configurable archiving (ZIP/GZ) while enforcing retention policies, path safety, and observability. Tailored for SRE-led environments like Telegram bot platforms, it ensures reproducible snapshots for debugging, compliance audits, and CI/CD pipelines—reducing operational toil and data loss risks.
+`create-dump` is a robust, production-ready CLI tool designed for automated code archival in large-scale monorepos. It generates branded Markdown dumps with embedded Git metadata, integrity checksums, and configurable archiving (ZIP/GZ) while enforcing retention policies, path safety, and observability. Tailored for SRE-led environments like Telegram bot platforms, it ensures reproducible snapshots for debugging, compliance audits, and CI/CD pipelines—reducing operational toil and data loss risks.
 
 Built with Python 3.11+, it leverages async patterns, Pydantic validation, and Prometheus metrics for scalability and reliability. Supports single-file dumps, batch orchestration across subdirectories, and dry-run modes for safe testing.
 
@@ -20,13 +20,13 @@ Install via pip and generate a dump in seconds:
 
 ```bash
 # Install from PyPI
-pip install code-dump
+pip install create-dump
 
 # Generate a single dump (defaults to current dir)
-code-dump single --dest ./dumps/my-snapshot.md
+create-dump single --dest ./dumps/my-snapshot.md
 
 # Batch dump a monorepo with archiving
-code-dump batch --root ./monorepo --archive --keep-last 5
+create-dump batch --root ./monorepo --archive --keep-last 5
 ```
 
 Output: A self-contained Markdown file (`my-snapshot_all_code_dump_YYYYMMDD_HHMMSS.md`) with TOC, fenced code blocks, and `.sha256` checksum.
@@ -58,30 +58,30 @@ Output: A self-contained Markdown file (`my-snapshot_all_code_dump_YYYYMMDD_HHMM
 
 ### Via PyPI (Recommended)
 ```bash
-pip install code-dump
+pip install create-dump
 ```
 
 ### From Source
 ```bash
-git clone https://github.com/dhruv/code-dump.git
-cd code-dump
+git clone https://github.com/dhruv/create-dump.git
+cd create-dump
 pip install -e .[dev]  # Includes testing tools
 ```
 
 ### Docker (For CI/Prod)
 ```dockerfile
 FROM python:3.12-slim
-RUN pip install code-dump
-ENTRYPOINT ["code-dump"]
+RUN pip install create-dump
+ENTRYPOINT ["create-dump"]
 ```
 
 ## ⚙️ Configuration
 
-Defaults are loaded from `pyproject.toml` [tool.code-dump] section. Override via CLI or env vars.
+Defaults are loaded from `pyproject.toml` [tool.create-dump] section. Override via CLI or env vars.
 
 ### TOML Example (`pyproject.toml`)
 ```toml
-[tool.code-dump]
+[tool.create-dump]
 use_gitignore = true
 git_meta = true
 max_file_size_kb = 5000
@@ -92,7 +92,7 @@ metrics_port = 8000
 ```
 
 ### CLI Overrides
-Flags take precedence; see `code-dump --help` for full options.
+Flags take precedence; see `create-dump --help` for full options.
 
 ## 📖 Usage
 
@@ -101,13 +101,13 @@ For quick snapshots of current files.
 
 ```bash
 # Basic dump
-code-dump single --files "src/*.py" --no-toc --progress
+create-dump single --files "src/*.py" --no-toc --progress
 
 # With Git meta and dest
-code-dump single --dest ./output.md --git-meta --include-current
+create-dump single --dest ./output.md --git-meta --include-current
 
 # Dry-run validation
-code-dump single --dry-run --verbose
+create-dump single --dry-run --verbose
 ```
 
 ### Batch Mode: Monorepo Orchestration
@@ -115,13 +115,13 @@ Automated discovery and archival across subdirs.
 
 ```bash
 # Full batch with pruning
-code-dump batch --root ./monorepo --keep-last 10 --clean-root --archive-all
+create-dump batch --root ./monorepo --keep-last 10 --clean-root --archive-all
 
 # Search recursive, exclude patterns
-code-dump batch --search --exclude "tests/**" --max-size 10MB
+create-dump batch --search --exclude "tests/**" --max-size 10MB
 
 # Grouped archiving (e.g., src/tests)
-code-dump batch --archive-all --keep-latest
+create-dump batch --archive-all --keep-latest
 ```
 
 ### Archiving Workflow
@@ -169,7 +169,7 @@ For deep dives: See [ADR-001: Unified Archiving](ADRs/001-unified-archiving.md).
 
 ### Running Tests
 ```bash
-pytest --cov=src/code_dump --cov-report=html  # 93%+ threshold
+pytest --cov=src/create_dump --cov-report=html  # 93%+ threshold
 hypothesis pytest tests/  # Property-based fuzzing
 ```
 
@@ -181,7 +181,7 @@ mypy src/               # Type checking
 ```
 
 ### Doctests
-Integrated via pytest; run standalone with `PYTHONPATH=src python -m doctest -v src/code_dump/*.py`.
+Integrated via pytest; run standalone with `PYTHONPATH=src python -m doctest -v src/create_dump/*.py`.
 
 ## 🔒 Security & Reliability
 

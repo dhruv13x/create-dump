@@ -7,8 +7,8 @@ from unittest.mock import patch, MagicMock, call, ANY
 from typer import Exit
 from contextlib import nullcontext
 
-from code_dump.single import run_single
-from code_dump.core import GitMeta, load_config, Config
+from create_dump.single import run_single
+from create_dump.core import GitMeta, load_config, Config
 
 
 @pytest.fixture
@@ -21,15 +21,15 @@ class TestRunSingle:
     @pytest.mark.parametrize("max_size", [None, 1024])  # Coverage: 80-82 override
     def test_valid_root_success(self, mock_root: Path, max_size: Optional[int]):
         mock_root.joinpath("test.py").write_text("content")
-        with patch("code_dump.single.load_config") as mock_load, \
-             patch("code_dump.single.FileCollector") as mock_collector, \
-             patch("code_dump.single.get_git_meta") as mock_git, \
-             patch("code_dump.single._unique_path") as mock_unique, \
-             patch("code_dump.single.metrics_server") as mock_server, \
-             patch("code_dump.single.DUMP_DURATION") as mock_duration, \
-             patch("code_dump.single.MarkdownWriter") as mock_writer, \
-             patch("code_dump.single.ChecksumWriter") as mock_checksum, \
-             patch("code_dump.single.ArchiveManager") as mock_archive:
+        with patch("create_dump.single.load_config") as mock_load, \
+             patch("create_dump.single.FileCollector") as mock_collector, \
+             patch("create_dump.single.get_git_meta") as mock_git, \
+             patch("create_dump.single._unique_path") as mock_unique, \
+             patch("create_dump.single.metrics_server") as mock_server, \
+             patch("create_dump.single.DUMP_DURATION") as mock_duration, \
+             patch("create_dump.single.MarkdownWriter") as mock_writer, \
+             patch("create_dump.single.ChecksumWriter") as mock_checksum, \
+             patch("create_dump.single.ArchiveManager") as mock_archive:
             # Use real Config for model_copy override testing
             runner_cfg = Config(max_file_size_kb=100, use_gitignore=True)
             if max_size is not None:
@@ -98,10 +98,10 @@ class TestRunSingle:
 
     def test_dry_run(self, mock_root: Path):
         mock_root.joinpath("test.py").write_text("content")
-        with patch("code_dump.single.load_config") as mock_load, \
-             patch("code_dump.single.FileCollector") as mock_collector, \
-             patch("code_dump.single.styled_print") as mock_print, \
-             patch("code_dump.single.MarkdownWriter") as mock_writer:
+        with patch("create_dump.single.load_config") as mock_load, \
+             patch("create_dump.single.FileCollector") as mock_collector, \
+             patch("create_dump.single.styled_print") as mock_print, \
+             patch("create_dump.single.MarkdownWriter") as mock_writer:
             mock_config = Config(max_file_size_kb=100, use_gitignore=True)  # Real Config
             mock_load.return_value = mock_config
             mock_collector.return_value.collect.return_value = ["test.py"]
@@ -137,10 +137,10 @@ class TestRunSingle:
 
     @pytest.mark.parametrize("allow_empty, expected_exit", [(True, None), (False, 1)])  # Coverage: 173-176
     def test_no_files_allow_empty(self, mock_root: Path, allow_empty: bool, expected_exit: Optional[int]):
-        with patch("code_dump.single.load_config") as mock_load, \
-             patch("code_dump.single.FileCollector") as mock_collector, \
-             patch("code_dump.single.logger.warning") as mock_warn, \
-             patch("code_dump.single.styled_print") as mock_print:
+        with patch("create_dump.single.load_config") as mock_load, \
+             patch("create_dump.single.FileCollector") as mock_collector, \
+             patch("create_dump.single.logger.warning") as mock_warn, \
+             patch("create_dump.single.styled_print") as mock_print:
             mock_config = Config(max_file_size_kb=100, use_gitignore=True)  # Real
             mock_load.return_value = mock_config
             mock_collector.return_value.collect.return_value = []
@@ -236,12 +236,12 @@ class TestRunSingle:
 
     def test_compress(self, mock_root: Path):
         mock_root.joinpath("test.py").write_text("content")
-        with patch("code_dump.single.load_config") as mock_load, \
-             patch("code_dump.single.FileCollector") as mock_collector, \
-             patch("code_dump.single._unique_path") as mock_unique, \
-             patch("code_dump.single.gzip") as mock_gzip, \
-             patch("code_dump.single.shutil") as mock_shutil, \
-             patch("code_dump.single.ChecksumWriter") as mock_checksum:
+        with patch("create_dump.single.load_config") as mock_load, \
+             patch("create_dump.single.FileCollector") as mock_collector, \
+             patch("create_dump.single._unique_path") as mock_unique, \
+             patch("create_dump.single.gzip") as mock_gzip, \
+             patch("create_dump.single.shutil") as mock_shutil, \
+             patch("create_dump.single.ChecksumWriter") as mock_checksum:
             mock_config = Config(max_file_size_kb=100, use_gitignore=True)  # Real
             mock_load.return_value = mock_config
             mock_collector.return_value.collect.return_value = ["test.py"]
@@ -282,12 +282,12 @@ class TestRunSingle:
 
     def test_archive(self, mock_root: Path):
         mock_root.joinpath("test.py").write_text("content")
-        with patch("code_dump.single.load_config") as mock_load, \
-             patch("code_dump.single.FileCollector") as mock_collector, \
-             patch("code_dump.single.get_git_meta") as mock_git, \
-             patch("code_dump.single._unique_path") as mock_unique, \
-             patch("code_dump.single.ArchiveManager") as mock_archive, \
-             patch("code_dump.single.ChecksumWriter") as mock_checksum:
+        with patch("create_dump.single.load_config") as mock_load, \
+             patch("create_dump.single.FileCollector") as mock_collector, \
+             patch("create_dump.single.get_git_meta") as mock_git, \
+             patch("create_dump.single._unique_path") as mock_unique, \
+             patch("create_dump.single.ArchiveManager") as mock_archive, \
+             patch("create_dump.single.ChecksumWriter") as mock_checksum:
             mock_config = Config(max_file_size_kb=100, use_gitignore=True)  # Real
             mock_load.return_value = mock_config
             mock_collector.return_value.collect.return_value = ["test.py"]
@@ -340,10 +340,10 @@ class TestRunSingle:
 
     def test_no_confirm_force(self, mock_root: Path):
         mock_root.joinpath("test.py").write_text("content")
-        with patch("code_dump.single.load_config") as mock_load, \
-             patch("code_dump.single.FileCollector") as mock_collector, \
-             patch("code_dump.single.styled_print") as mock_print, \
-             patch("code_dump.single.input") as mock_input:
+        with patch("create_dump.single.load_config") as mock_load, \
+             patch("create_dump.single.FileCollector") as mock_collector, \
+             patch("create_dump.single.styled_print") as mock_print, \
+             patch("create_dump.single.input") as mock_input:
             mock_config = Config(max_file_size_kb=100, use_gitignore=True)  # Real
             mock_load.return_value = mock_config
             mock_collector.return_value.collect.return_value = ["test.py"]
@@ -380,8 +380,8 @@ class TestRunSingle:
 
     def test_max_file_size_override(self, mock_root: Path):
         mock_root.joinpath("test.py").write_text("content")
-        with patch("code_dump.single.load_config") as mock_load, \
-             patch("code_dump.single.FileCollector") as mock_collector:
+        with patch("create_dump.single.load_config") as mock_load, \
+             patch("create_dump.single.FileCollector") as mock_collector:
             base_config = Config(max_file_size_kb=50)  # Real base
             mock_load.return_value = base_config
             mock_collector.return_value.collect.return_value = ["test.py"]
@@ -422,8 +422,8 @@ class TestRunSingle:
     def test_patterns_exclude_include(self, mock_root: Path, include: str, exclude: str, expected_inc: list, expected_exc: list):
         mock_root.joinpath("test.py").write_text("content")
         mock_root.joinpath("exclude.txt").write_text("exclude")
-        with patch("code_dump.single.load_config") as mock_load, \
-             patch("code_dump.single.FileCollector") as mock_collector:
+        with patch("create_dump.single.load_config") as mock_load, \
+             patch("create_dump.single.FileCollector") as mock_collector:
             mock_config = Config(max_file_size_kb=100, use_gitignore=True)  # Real
             mock_load.return_value = mock_config
             mock_collector.return_value.collect.return_value = ["test.py"]
@@ -458,15 +458,15 @@ class TestRunSingle:
     # FIXED: Coverage 105-110: Confirm prompt – Use partial/ANY for dynamic filename
     def test_confirm_prompt(self, mock_root: Path):
         (mock_root / "test.py").touch()
-        with patch("code_dump.single.load_config") as mock_load, \
-             patch("code_dump.single.FileCollector") as mock_collector, \
-             patch("code_dump.single.styled_print") as mock_print, \
+        with patch("create_dump.single.load_config") as mock_load, \
+             patch("create_dump.single.FileCollector") as mock_collector, \
+             patch("create_dump.single.styled_print") as mock_print, \
              patch("builtins.input", return_value="y"):
             mock_config = Config(max_file_size_kb=100, use_gitignore=True)
             mock_load.return_value = mock_config
             mock_collector.return_value.collect.return_value = ["test.py"]
             # Mock unique to return predictable branded for prompt assert
-            with patch("code_dump.single._unique_path") as mock_unique:
+            with patch("create_dump.single._unique_path") as mock_unique:
                 mock_unique.return_value = Path("project_all_code_dump_20251030_172000.md")  # Static for assert
                 run_single(
                     root=mock_root,
@@ -505,9 +505,9 @@ class TestRunSingle:
     # FIXED: Coverage 126-129: Chdir and log – Correct patch path to utils.logger
     def test_chdir_log(self, mock_root: Path):
         (mock_root / "test.py").touch()
-        with patch("code_dump.single.load_config") as mock_load, \
-             patch("code_dump.single.FileCollector") as mock_collector, \
-             patch("code_dump.utils.logger.info") as mock_info:  # FIXED: Full utils path
+        with patch("create_dump.single.load_config") as mock_load, \
+             patch("create_dump.single.FileCollector") as mock_collector, \
+             patch("create_dump.utils.logger.info") as mock_info:  # FIXED: Full utils path
             mock_config = Config(max_file_size_kb=100, use_gitignore=True)
             mock_load.return_value = mock_config
             mock_collector.return_value.collect.return_value = ["test.py"]
@@ -547,10 +547,10 @@ class TestRunSingle:
     # NEW: Coverage 178-180: Archive results logging
     def test_archive_results_log(self, mock_root: Path):
         (mock_root / "test.py").touch()
-        with patch("code_dump.single.load_config") as mock_load, \
-             patch("code_dump.single.FileCollector") as mock_collector, \
-             patch("code_dump.single.ArchiveManager") as mock_archive, \
-             patch("code_dump.single.styled_print") as mock_print:
+        with patch("create_dump.single.load_config") as mock_load, \
+             patch("create_dump.single.FileCollector") as mock_collector, \
+             patch("create_dump.single.ArchiveManager") as mock_archive, \
+             patch("create_dump.single.styled_print") as mock_print:
             mock_config = Config(max_file_size_kb=100, use_gitignore=True)
             mock_load.return_value = mock_config
             mock_collector.return_value.collect.return_value = ["test.py"]
@@ -586,10 +586,10 @@ class TestRunSingle:
     # NEW: Coverage 182-185: No prior dumps msg
     def test_no_prior_dumps_msg(self, mock_root: Path):
         (mock_root / "test.py").touch()
-        with patch("code_dump.single.load_config") as mock_load, \
-             patch("code_dump.single.FileCollector") as mock_collector, \
-             patch("code_dump.single.ArchiveManager") as mock_archive, \
-             patch("code_dump.single.styled_print") as mock_print:
+        with patch("create_dump.single.load_config") as mock_load, \
+             patch("create_dump.single.FileCollector") as mock_collector, \
+             patch("create_dump.single.ArchiveManager") as mock_archive, \
+             patch("create_dump.single.styled_print") as mock_print:
             mock_config = Config(max_file_size_kb=100, use_gitignore=True)
             mock_load.return_value = mock_config
             mock_collector.return_value.collect.return_value = ["test.py"]
@@ -626,10 +626,10 @@ class TestRunSingle:
     def test_dest_resolution(self, mock_root: Path):  # FIXED: Drop max_size param
         dest_dir = mock_root / "custom_dest"
         (mock_root / "test.py").touch()
-        with patch("code_dump.single.load_config") as mock_load, \
-             patch("code_dump.single.FileCollector") as mock_collector, \
-             patch("code_dump.single._unique_path") as mock_unique, \
-             patch("code_dump.single.ChecksumWriter") as mock_checksum:  # FIXED: Mock checksum to skip I/O
+        with patch("create_dump.single.load_config") as mock_load, \
+             patch("create_dump.single.FileCollector") as mock_collector, \
+             patch("create_dump.single._unique_path") as mock_unique, \
+             patch("create_dump.single.ChecksumWriter") as mock_checksum:  # FIXED: Mock checksum to skip I/O
             mock_config = Config(max_file_size_kb=100, use_gitignore=True)
             mock_load.return_value = mock_config
             mock_collector.return_value.collect.return_value = ["test.py"]
@@ -673,15 +673,15 @@ class TestRunSingle:
     def test_temp_cleanup_exception(self, mock_root: Path):
          (mock_root / "test.py").touch()
  
-         with patch("code_dump.single.load_config") as mock_load, \
-              patch("code_dump.single.FileCollector") as mock_collector, \
-              patch("code_dump.single.MarkdownWriter") as mock_writer, \
-              patch("code_dump.single.TemporaryDirectory") as mock_temp, \
-              patch("code_dump.single.get_git_meta", return_value=None), \
-              patch("code_dump.single._unique_path", return_value=mock_root / "dump.md"), \
-              patch("code_dump.single.ChecksumWriter") as mock_checksum, \
-              patch("code_dump.single.metrics_server", return_value=nullcontext()), \
-              patch("code_dump.utils.DUMP_DURATION.time", return_value=nullcontext()):
+         with patch("create_dump.single.load_config") as mock_load, \
+              patch("create_dump.single.FileCollector") as mock_collector, \
+              patch("create_dump.single.MarkdownWriter") as mock_writer, \
+              patch("create_dump.single.TemporaryDirectory") as mock_temp, \
+              patch("create_dump.single.get_git_meta", return_value=None), \
+              patch("create_dump.single._unique_path", return_value=mock_root / "dump.md"), \
+              patch("create_dump.single.ChecksumWriter") as mock_checksum, \
+              patch("create_dump.single.metrics_server", return_value=nullcontext()), \
+              patch("create_dump.utils.DUMP_DURATION.time", return_value=nullcontext()):
  
              # Mock configuration load
              mock_config = Config(max_file_size_kb=100, use_gitignore=True)

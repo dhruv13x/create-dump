@@ -6,7 +6,7 @@ from pathlib import Path
 import toml
 import re
 
-from code_dump.core import (
+from create_dump.core import (
     Config,
     GitMeta,
     DumpFile,
@@ -41,9 +41,9 @@ def test_dumpfile_model():
 
 
 def test_load_config(tmp_path: Path):
-    config_path = tmp_path / "code_dump.toml"
+    config_path = tmp_path / "create_dump.toml"
     config_path.write_text(
-        "[tool.code-dump]\n"
+        "[tool.create-dump]\n"
         "max_file_size_kb = 512\n"
         "excluded_dirs = ['custom']"
     )
@@ -152,18 +152,18 @@ def test_load_config_multiple_paths(monkeypatch, tmp_path: Path):
     # Create home config (first in order)
     home_dir = mock_home()
     home_dir.mkdir()
-    home_config = home_dir / ".code_dump.toml"
-    home_config.write_text("[tool.code-dump]\nuse_gitignore = false")
+    home_config = home_dir / ".create_dump.toml"
+    home_config.write_text("[tool.create-dump]\nuse_gitignore = false")
 
     # CWD config (second)
     cwd_dir = mock_cwd()
     cwd_dir.mkdir()
-    cwd_config = cwd_dir / ".code_dump.toml"
-    cwd_config.write_text("[tool.code-dump]\nuse_gitignore = true")
+    cwd_config = cwd_dir / ".create_dump.toml"
+    cwd_config.write_text("[tool.create-dump]\nuse_gitignore = true")
 
     # Root config (third)
-    root_config = tmp_path / "code_dump.toml"
-    root_config.write_text("[tool.code-dump]\nuse_gitignore = maybe")
+    root_config = tmp_path / "create_dump.toml"
+    root_config.write_text("[tool.create-dump]\nuse_gitignore = maybe")
 
     # Loads home first
     cfg = load_config()
@@ -182,13 +182,13 @@ def test_load_config_multiple_paths(monkeypatch, tmp_path: Path):
 
 
 def test_load_config_tool_namespace(tmp_path: Path):
-    # Correct [tool.code-dump]
+    # Correct [tool.create-dump]
     pyproject = tmp_path / "pyproject.toml"
     valid_custom_pattern = r".*_all_code_dump_custom_\d+\.md$"
     # Escape for TOML: double backslashes for literal \
     toml_pattern = valid_custom_pattern.replace("\\", "\\\\")
     pyproject.write_text(
-        f"[tool.code-dump]\n"
+        f"[tool.create-dump]\n"
         f"git_meta = false\n"
         f"dest = \"dumps\"\n"
         f"dump_pattern = \"{toml_pattern}\""

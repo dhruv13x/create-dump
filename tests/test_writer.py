@@ -9,8 +9,8 @@ from concurrent.futures._base import FINISHED
 from contextlib import contextmanager
 from concurrent.futures import TimeoutError
 
-from code_dump.core import DumpFile, GitMeta
-from code_dump.writer import MarkdownWriter, ChecksumWriter
+from create_dump.core import DumpFile, GitMeta
+from create_dump.writer import MarkdownWriter, ChecksumWriter
 
 
 @pytest.fixture
@@ -42,7 +42,7 @@ def test_process_file_error(writer_instance, tmp_path: Path):
 
 
 @patch.object(MarkdownWriter, '_write_md_streamed')
-@patch('code_dump.writer.as_completed')
+@patch('create_dump.writer.as_completed')
 def test_dump_concurrent(mock_as_completed, mock_write, writer_instance):
     files_list = ["test1.py", "test2.py"]
     mock_futures = [Mock(), Mock()]
@@ -88,7 +88,7 @@ def test_process_file_exception_after_temp(writer_instance, tmp_path: Path):
     test_file = tmp_path / "test.py"
     test_file.write_text('print("hello")')
     with patch("pathlib.Path.unlink") as mock_unlink, \
-         patch('code_dump.utils.FILES_PROCESSED.labels') as mock_labels:
+         patch('create_dump.utils.FILES_PROCESSED.labels') as mock_labels:
         mock_labels.return_value.inc = MagicMock(side_effect=Exception("After inc"))
         df = writer_instance.process_file(str(test_file))
     assert df.error == "After inc"
@@ -104,7 +104,7 @@ def test_dump_concurrent_progress_timeout(writer_instance):
     mock_executor.submit.return_value = mock_future
     with patch("concurrent.futures.ThreadPoolExecutor", return_value=mock_executor), \
          patch("concurrent.futures.as_completed", return_value=[mock_future]):
-        with patch("code_dump.writer.HAS_RICH", True):
+        with patch("create_dump.writer.HAS_RICH", True):
             # Mock Progress class to return a mock instance
             mock_progress_class = MagicMock()
             mock_progress_instance = MagicMock()
@@ -112,7 +112,7 @@ def test_dump_concurrent_progress_timeout(writer_instance):
             mock_progress_instance.__enter__.return_value = mock_progress_instance
             mock_progress_instance.__exit__.return_value = False
             mock_progress_class.return_value = mock_progress_instance
-            with patch("code_dump.writer.Progress", mock_progress_class):
+            with patch("create_dump.writer.Progress", mock_progress_class):
                 writer_instance.dump_concurrent(files_list, progress=True, max_workers=1)
                 mock_progress_instance.advance.assert_called_once_with(0)
 
@@ -126,7 +126,7 @@ def test_dump_concurrent_as_completed_timeout(writer_instance):
     mock_future.running.return_value = False
     with patch("concurrent.futures.as_completed") as mock_completed, \
          patch("concurrent.futures.ThreadPoolExecutor") as mock_exec, \
-         patch("code_dump.writer.HAS_RICH", False):
+         patch("create_dump.writer.HAS_RICH", False):
         mock_completed.return_value = [mock_future]
         mock_exec.return_value.__enter__.return_value.submit.return_value = mock_future
         writer_instance.dump_concurrent(files_list, progress=False, max_workers=1)

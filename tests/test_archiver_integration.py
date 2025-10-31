@@ -9,8 +9,8 @@ from datetime import datetime
 from unittest.mock import patch, MagicMock, ANY
 import zipfile
 
-from code_dump.archiver import ArchiveManager
-from code_dump.utils import logger
+from create_dump.archiver import ArchiveManager
+from create_dump.utils import logger
 
 
 @pytest.fixture
@@ -43,7 +43,7 @@ def test_manager_bundling(mock_root: Path, pairs_count: int):
     timestamp = "20251028_045000"
 
     # keep_latest=True: retain newest (lowest i)
-    with patch('code_dump.archiver.logger') as mock_logger, \
+    with patch('create_dump.archiver.logger') as mock_logger, \
          patch.object(ArchiveManager, "find_dump_pairs", return_value=sample_pairs(mock_root, pairs_count)):
         manager = ArchiveManager(mock_root, timestamp, keep_latest=True, verbose=True)
         archive_results = manager.run()
@@ -62,7 +62,7 @@ def test_manager_bundling(mock_root: Path, pairs_count: int):
             assert archive_results == {}
 
     # keep_latest=False: archive all
-    with patch('code_dump.archiver.logger') as mock_logger, \
+    with patch('create_dump.archiver.logger') as mock_logger, \
          patch.object(ArchiveManager, "find_dump_pairs", return_value=sample_pairs(mock_root, pairs_count)):
         manager = ArchiveManager(mock_root, timestamp, keep_latest=False, verbose=True)
         archive_results = manager.run()
@@ -87,7 +87,7 @@ def test_manager_orphan_warn(mock_root: Path):
     sha.write_text("abc")
 
     timestamp = "20251028_045000"
-    with patch('code_dump.archiver.logger.warning') as mock_warn:
+    with patch('create_dump.archiver.logger.warning') as mock_warn:
         manager = ArchiveManager(mock_root, timestamp, verbose=True)
         manager.run()
     # Orphan quarantined, valid pair processed
@@ -110,7 +110,7 @@ def test_manager_invalid_path_skip(mock_root: Path):
 
      timestamp = "20251028_045000"
      manager = ArchiveManager(mock_root, timestamp, verbose=True)
-     with patch('code_dump.archiver.safe_is_within') as mock_within:
+     with patch('create_dump.archiver.safe_is_within') as mock_within:
          mock_within.side_effect = lambda p, r: p.parent == mock_root  # True for root, False for invalid
          pairs = manager.find_dump_pairs()
          assert len(pairs) == 1  # Valid pair included; invalid skipped by safe_is_within
@@ -126,7 +126,7 @@ def test_manager_dry_run_archive(mock_root: Path):
     sha.write_text("abc")
 
     timestamp = "20251028_045000"
-    with patch('code_dump.archiver.logger.info') as mock_info, \
+    with patch('create_dump.archiver.logger.info') as mock_info, \
          patch.object(ArchiveManager, "find_dump_pairs", return_value=[(md, sha)]), \
          patch.object(ArchiveManager, "_create_archive", return_value=(Path("dummy.zip"), [])):
         manager = ArchiveManager(mock_root, timestamp, dry_run=True, verbose=True, keep_latest=False)
@@ -148,8 +148,8 @@ def test_manager_clean_root_confirm(mock_root: Path):
 
     timestamp = "20251028_045000"
     manager = ArchiveManager(mock_root, timestamp, clean_root=True, yes=False, verbose=True, keep_latest=False)
-    with patch('code_dump.archiver.confirm') as mock_confirm, \
-         patch('code_dump.archiver.safe_delete_paths') as mock_delete, \
+    with patch('create_dump.archiver.confirm') as mock_confirm, \
+         patch('create_dump.archiver.safe_delete_paths') as mock_delete, \
          patch.object(manager, "find_dump_pairs", return_value=[(to_delete[0], to_delete[1])]), \
          patch.object(manager, "_handle_single_archive", return_value=({}, to_delete)):
         mock_confirm.return_value = True
@@ -174,7 +174,7 @@ def test_manager_prune_basic(mock_root: Path):
     manager = ArchiveManager(mock_root, "20251028_045000", keep_last=3, verbose=True)
 
     with patch.object(manager, '_create_archive') as mock_archive, \
-         patch('code_dump.archiver.safe_delete_paths') as mock_delete, \
+         patch('create_dump.archiver.safe_delete_paths') as mock_delete, \
          patch.object(manager, "find_dump_pairs", return_value=[]):
         mock_archive.return_value = Path("dummy.zip")
         mock_delete.return_value = (2, 0)
@@ -187,8 +187,8 @@ def test_manager_prune_basic(mock_root: Path):
 def test_prune_none(mock_root: Path):
     timestamp = "20251028_045000"
     manager = ArchiveManager(mock_root, timestamp, keep_last=None)
-    with patch('code_dump.archiver.logger.info') as mock_info, \
-         patch('code_dump.archiver.safe_delete_paths') as mock_delete:
+    with patch('create_dump.archiver.logger.info') as mock_info, \
+         patch('create_dump.archiver.safe_delete_paths') as mock_delete:
         manager._prune_old_archives()
     mock_delete.assert_not_called()
     
@@ -205,9 +205,9 @@ def test_run_deferred_delete(mock_root: Path, archive_all, expected_prompt):
     manager = ArchiveManager(mock_root, "20251028_045000", archive_all=archive_all, clean_root=True, no_remove=False, dry_run=False, yes=False, verbose=True)
     with patch.object(manager, "find_dump_pairs") as mock_find, \
          patch.object(manager, "_handle_single_archive" if not archive_all else "_handle_grouped_archives") as mock_handle, \
-         patch('code_dump.archiver.confirm') as mock_confirm, \
-         patch('code_dump.archiver.safe_delete_paths') as mock_delete, \
-         patch('code_dump.archiver.logger.info') as mock_info:
+         patch('create_dump.archiver.confirm') as mock_confirm, \
+         patch('create_dump.archiver.safe_delete_paths') as mock_delete, \
+         patch('create_dump.archiver.logger.info') as mock_info:
         mock_find.return_value = [(md, sha)]
         mock_handle.return_value = ({'default': Path("zip")}, [md, sha])
         mock_confirm.return_value = True

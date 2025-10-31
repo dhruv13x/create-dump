@@ -1,4 +1,4 @@
-# src/code_dump/path_utils.py
+# src/create_dump/path_utils.py
 """Shared utilities for path safety, discovery, and user confirmation."""
 
 from __future__ import annotations

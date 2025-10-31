@@ -1,4 +1,4 @@
-# src/code_dump/core.py
+# src/create_dump/core.py
 """Core models and configuration.
 
 Pydantic models for validation, config loading.
@@ -106,17 +106,17 @@ def load_config(path: Optional[Path] = None) -> Config:
         [path]
         if path
         else [
-            Path.home() / ".code_dump.toml",
-            Path.cwd() / ".code_dump.toml",
-            Path("code_dump.toml"),
+            Path.home() / ".create_dump.toml",
+            Path.cwd() / ".create_dump.toml",
+            Path("create_dump.toml"),
         ]
     )
     for conf_path in possible_paths:
         if conf_path.exists():
             try:
                 full_data = toml.load(conf_path)
-                # NEW: Load from [tool.code-dump] namespace
-                config_data = full_data.get("tool", {}).get("code-dump", {})
+                # NEW: Load from [tool.create-dump] namespace
+                config_data = full_data.get("tool", {}).get("create-dump", {})
                 logger.debug("Config loaded", path=conf_path, keys=list(config_data.keys()))
                 break
             except (toml.TomlDecodeError, OSError) as e:

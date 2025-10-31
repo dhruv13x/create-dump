@@ -1,4 +1,4 @@
-# src/code_dump/archiver.py
+# src/create_dump/archiver.py
 """Unified archiving: ZIP packaging, pruning, cleanup with policy enforcement.
 
 Single abstraction for single-mode (ad-hoc) and batch (retention) workflows.

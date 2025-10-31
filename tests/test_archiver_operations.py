@@ -9,10 +9,10 @@ from datetime import datetime
 import zipfile
 import re  # For prune assert
 
-from code_dump.path_utils import safe_is_within
-from code_dump.archiver import ArchiveManager, ArchiveError
-from code_dump.utils import logger
-from code_dump.core import DEFAULT_DUMP_PATTERN
+from create_dump.path_utils import safe_is_within
+from create_dump.archiver import ArchiveManager, ArchiveError
+from create_dump.utils import logger
+from create_dump.core import DEFAULT_DUMP_PATTERN
 
 
 @pytest.fixture
@@ -86,7 +86,7 @@ def test_create_archive_validate_corrupt(mock_root: Path):
     file_txt = mock_root / "test.txt"
     file_txt.touch()
     zip_name = "test.zip"
-    with patch("code_dump.archiver.zipfile.ZipFile") as mock_zip, \
+    with patch("create_dump.archiver.zipfile.ZipFile") as mock_zip, \
          patch("pathlib.Path.unlink") as mock_unlink, \
          patch.object(logger, "error") as mock_err:
         # Mock write succeeds
@@ -110,7 +110,7 @@ def test_create_archive_unexpected_error(mock_root: Path):
     file_txt = mock_root / "test.txt"
     file_txt.touch()
     zip_name = "test.zip"
-    with patch("code_dump.archiver.zipfile.ZipFile") as mock_zip, \
+    with patch("create_dump.archiver.zipfile.ZipFile") as mock_zip, \
          patch("pathlib.Path.unlink") as mock_unlink, \
          patch.object(logger, "error") as mock_err:
         mock_zip_write = MagicMock()
@@ -144,7 +144,7 @@ def test_prune_old_archives(mock_root: Path):
 
 def test_prune_old_archives_below_threshold(mock_root: Path):
     manager = ArchiveManager(mock_root, "20251028_042000", keep_last=5)
-    with patch("code_dump.archiver.re.compile") as mock_re:
+    with patch("create_dump.archiver.re.compile") as mock_re:
         mock_match = MagicMock()
         mock_match.return_value = None
         mock_re.return_value.match.return_value = None
@@ -159,7 +159,7 @@ def test_prune_old_archives_verbose(mock_root: Path):
     old_zip = archives_dir / f"bot_platform_all_code_dump_20251028_{ts}.zip"
     old_zip.touch()
     manager = ArchiveManager(mock_root, "20251028_042000", keep_last=0, verbose=True)
-    with patch("code_dump.archiver.safe_delete_paths", return_value=(1, 0)), \
+    with patch("create_dump.archiver.safe_delete_paths", return_value=(1, 0)), \
          patch.object(logger, "debug") as mock_debug:
         manager._prune_old_archives()
         mock_debug.assert_called_once_with("Pruned archives: %s", [old_zip.name])
@@ -253,8 +253,8 @@ class TestArchiveHandles:
         manager.verbose = True
         with patch.object(manager, "extract_timestamp") as mock_ts, \
              patch.object(manager, "_create_archive") as mock_create, \
-             patch('code_dump.archiver.confirm') as mock_confirm, \
-             patch('code_dump.archiver.safe_delete_paths') as mock_delete, \
+             patch('create_dump.archiver.confirm') as mock_confirm, \
+             patch('create_dump.archiver.safe_delete_paths') as mock_delete, \
              patch.object(logger, "info") as mock_info, \
              patch.object(logger, "debug") as mock_debug, \
              patch('pathlib.Path.stat') as mock_stat:
@@ -340,9 +340,9 @@ class TestHandleGroupedArchives:
         manager.verbose = True
 
         with patch.object(manager, "_create_archive") as mock_create, \
-             patch("code_dump.archiver.logger.warning") as mock_warn, \
-             patch("code_dump.archiver.logger.debug") as mock_debug, \
-             patch("code_dump.archiver.logger.info") as mock_info, \
+             patch("create_dump.archiver.logger.warning") as mock_warn, \
+             patch("create_dump.archiver.logger.debug") as mock_debug, \
+             patch("create_dump.archiver.logger.info") as mock_info, \
              patch("pathlib.Path.mkdir") as mock_mkdir, \
              patch("pathlib.Path.rename") as mock_rename, \
              patch.object(manager, "extract_timestamp") as mock_ts:
@@ -391,7 +391,7 @@ class TestHandleGroupedArchives:
         """Cover len(historical)==0 log/skip."""
         manager.keep_latest = True
 
-        with patch("code_dump.archiver.logger.info") as mock_info:
+        with patch("create_dump.archiver.logger.info") as mock_info:
             single_group = {"src": sample_groups["src"][:1]}  # Only 1 pair → no historicals
             results, to_del = manager._handle_grouped_archives(single_group)
 
@@ -401,8 +401,8 @@ class TestHandleGroupedArchives:
 
 def test_init_loose_pattern(mock_root: Path):
     """Cover lines 74-75: loose md_pattern warning/enforce."""
-    with patch('code_dump.core.load_config') as mock_load, \
-         patch('code_dump.archiver.logger.warning') as mock_warn:
+    with patch('create_dump.core.load_config') as mock_load, \
+         patch('create_dump.archiver.logger.warning') as mock_warn:
         mock_load.return_value.dump_pattern = DEFAULT_DUMP_PATTERN
         manager = ArchiveManager(mock_root, "ts", md_pattern="loose_pattern")
         assert manager.md_pattern == DEFAULT_DUMP_PATTERN

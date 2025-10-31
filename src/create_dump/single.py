@@ -1,4 +1,4 @@
-# src/code_dump/single.py
+# src/create_dump/single.py
 """Single dump runner."""
 
 from __future__ import annotations

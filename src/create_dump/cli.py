@@ -19,7 +19,7 @@ from .single import run_single
 from .utils import setup_logging, styled_print, VERSION
 
 app = typer.Typer(
-    name="code-dump",
+    name="create-dump",
     add_completion=True,
     pretty_exceptions_enable=True,
     help="Enterprise-grade code dump utility for projects and monorepos.",
@@ -42,11 +42,11 @@ def main_callback(
     Defaults to 'single' mode if no subcommand provided.
 
     Examples:
-        $ code-dump single . --compress -y  # Quick gzipped dump, skip prompts
-        $ code-dump batch run --dirs src,tests --archive-all  # Batch with grouped archiving
+        $ create-dump single . --compress -y  # Quick gzipped dump, skip prompts
+        $ create-dump batch run --dirs src,tests --archive-all  # Batch with grouped archiving
     """
     if version:
-        styled_print(f"code-dump v{VERSION}")
+        styled_print(f"create-dump v{VERSION}")
         raise typer.Exit()
 
     load_config(Path(config) if config else None)  # Load early for shared use
@@ -101,8 +101,8 @@ def single(
     """Create a single code dump in the specified directory.
 
     Examples:
-        $ code-dump single src/ --dest dumps/ -c -y -v  # Compressed dump to subdir, skip prompts, verbose
-        $ code-dump single . --archive -a --archive-all  # Dump + single/grouped archiving
+        $ create-dump single src/ --dest dumps/ -c -y -v  # Compressed dump to subdir, skip prompts, verbose
+        $ create-dump single . --archive -a --archive-all  # Dump + single/grouped archiving
     """
     if not root.is_dir():
         raise typer.BadParameter(f"Root '{root}' is not a directory. Use '.' for cwd or a valid path.")
@@ -162,8 +162,8 @@ def batch_callback(
     """Batch operations: Run dumps across subdirectories with cleanup and centralization.
 
     Examples:
-        $ code-dump batch run --dirs src,tests --archive-all -y  # Batch dumps + grouped archive, skip prompts
-        $ code-dump batch clean --pattern '.*dump.*' -y -nd  # Real cleanup of olds
+        $ create-dump batch run --dirs src,tests --archive-all -y  # Batch dumps + grouped archive, skip prompts
+        $ create-dump batch clean --pattern '.*dump.*' -y -nd  # Real cleanup of olds
     """
     setup_logging(verbose=verbose, quiet=quiet)
 
@@ -211,7 +211,7 @@ def run(
     """Run dumps in multiple subdirectories, cleanup olds, and centralize files.
 
     Examples:
-        $ code-dump batch run src/ --dest central/ --dirs api,web -c -y -nd  # Real batch to central dir
+        $ create-dump batch run src/ --dest central/ --dirs api,web -c -y -nd  # Real batch to central dir
     """
     # Access inherited dry_run from callback via ctx
     inherited_dry_run = ctx.params.get('dry_run', True)  # Default from callback
@@ -257,7 +257,7 @@ def clean(
     """Cleanup old dump files/directories without running new dumps.
 
     Examples:
-        $ code-dump batch clean . '.*old_dump.*' -y -nd -v  # Real verbose cleanup
+        $ create-dump batch clean . '.*old_dump.*' -y -nd -v  # Real verbose cleanup
     """
     effective_dry_run = dry_run and not no_dry_run
     safe_cleanup(root, pattern, dry_run=effective_dry_run, assume_yes=yes, verbose=verbose)
@@ -286,7 +286,7 @@ def archive(
     """Archive existing dump pairs into ZIP; optional clean/prune (unified with single mode).
 
     Examples:
-        $ code-dump batch archive monorepo/ '.*custom' --archive-all -y -v  # Grouped archive, verbose, skip prompts
+        $ create-dump batch archive monorepo/ '.*custom' --archive-all -y -v  # Grouped archive, verbose, skip prompts
     """
     from .archiver import ArchiveManager
     setup_logging(verbose=verbose, quiet=quiet)

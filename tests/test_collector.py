@@ -1,12 +1,12 @@
 # tests/test_collector.py (fixed dir creation for __pycache__)
-# code_dump/tests/test_collector.py
+# create_dump/tests/test_collector.py
 """Tests for collector module."""
 
 import pytest
 from pathlib import Path
 
-from code_dump.collector import FileCollector
-from code_dump.core import Config
+from create_dump.collector import FileCollector
+from create_dump.core import Config
 
 
 @pytest.fixture
@@ -52,8 +52,8 @@ import pytest
 from pathlib import Path
 from unittest.mock import patch
 
-from code_dump.collector import FileCollector
-from code_dump.core import Config
+from create_dump.collector import FileCollector
+from create_dump.core import Config
 
 
 def test_collect_search_yield(mock_config, tmp_path: Path):
@@ -149,7 +149,7 @@ def test_matches_calls_should_include_on_oserror(mock_config, tmp_path: Path):
     test_file = tmp_path / "test.py"
     test_file.touch()
     collector = FileCollector(mock_config, includes=["*.py"], root=tmp_path)
-    with patch("code_dump.collector.is_text_file", return_value=True):  # Isolate
+    with patch("create_dump.collector.is_text_file", return_value=True):  # Isolate
         with patch("pathlib.Path.stat", side_effect=OSError("Permission denied")):
             assert collector._matches(test_file.relative_to(tmp_path)) is False  # Calls _should_include → false
 
