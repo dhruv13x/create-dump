@@ -1,0 +1,40 @@
+name: Publish to PyPI
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # Semantic tags only
+
+permissions:
+  contents: read  # Minimal for checkout
+
+jobs:
+  build:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    environment: pypi  # Protects with review/required approvers
+
+    steps:
+    - name: Checkout source
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install Hatchling
+      run: pip install hatchling
+
+    - name: Build package
+      run: python -m hatch build  # Generates dist/*.tar.gz and *.whl
+
+    - name: Verify build
+      run: |
+        twine check dist/*  # Requires: pip install twine
+
+    - name: Publish to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        verbose: true
+        skip-existing: true  # Idempotent: Skip if version exists
