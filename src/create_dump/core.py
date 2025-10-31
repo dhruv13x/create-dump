@@ -1,4 +1,4 @@
-# src/code_dump/core.py
+# src/create_dump/core.py
 """Core models and configuration.
 
 Pydantic models for validation, config loading.
@@ -16,7 +16,7 @@ from .utils import logger
 import toml
 
 # Canonical pattern for dump artifacts (imported/used by modules)
-DEFAULT_DUMP_PATTERN = r".*_all_code_dump_\d{8}_\d{6}\.(md(\.gz)?|sha256)$"  # NEW: Strict brandmark regex
+DEFAULT_DUMP_PATTERN = r".*_all_create_dump_\d{8}_\d{6}\.(md(\.gz)?|sha256)$"  # NEW: Strict brandmark regex
 
 
 class Config(BaseModel):
@@ -77,7 +77,7 @@ class Config(BaseModel):
     @classmethod
     def validate_dump_pattern(cls, v):
         """Ensure pattern is non-empty and warn on loose matches."""
-        if not v or not re.match(r'.*_all_code_dump_', v):  # Basic sanity
+        if not v or not re.match(r'.*_all_create_dump_', v):  # Basic sanity
             logger.warning("Loose or invalid dump_pattern '%s'; enforcing default: %s", v, DEFAULT_DUMP_PATTERN)
             return DEFAULT_DUMP_PATTERN
         return v
@@ -106,17 +106,17 @@ def load_config(path: Optional[Path] = None) -> Config:
         [path]
         if path
         else [
-            Path.home() / ".code_dump.toml",
-            Path.cwd() / ".code_dump.toml",
-            Path("code_dump.toml"),
+            Path.home() / ".create_dump.toml",
+            Path.cwd() / ".create_dump.toml",
+            Path("create_dump.toml"),
         ]
     )
     for conf_path in possible_paths:
         if conf_path.exists():
             try:
                 full_data = toml.load(conf_path)
-                # NEW: Load from [tool.code-dump] namespace
-                config_data = full_data.get("tool", {}).get("code-dump", {})
+                # NEW: Load from [tool.create-dump] namespace
+                config_data = full_data.get("tool", {}).get("create-dump", {})
                 logger.debug("Config loaded", path=conf_path, keys=list(config_data.keys()))
                 break
             except (toml.TomlDecodeError, OSError) as e:

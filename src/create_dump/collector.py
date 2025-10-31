@@ -1,4 +1,4 @@
-# src/code_dump/collector.py
+# src/create_dump/collector.py
 """
 File collection logic.
 
@@ -73,11 +73,11 @@ class FileCollector:
             "*config.json",
             "*secrets*",
             "__init__.py",
-            "*_all_code_dump_*",
-            "*_all_code_dump_*.md*",
-            "*_all_code_dump_*.gz*",
-            "*_all_code_dump_*.sha256",
-            "*_all_code_dump_*.zip",
+            "*_all_create_dump_*",
+            "*_all_create_dump_*.md*",
+            "*_all_create_dump_*.gz*",
+            "*_all_create_dump_*.sha256",
+            "*_all_create_dump_*.zip",
         ]
         all_excludes = default_excludes + self.excludes
 

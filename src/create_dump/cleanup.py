@@ -1,4 +1,4 @@
-# src/code_dump/cleanup.py
+# src/create_dump/cleanup.py
 """Safe, auditable cleanup of files/directories with dry-run and prompts."""
 
 from __future__ import annotations

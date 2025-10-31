@@ -1,4 +1,4 @@
-# src/code_dump/archiver.py
+# src/create_dump/archiver.py
 """Unified archiving: ZIP packaging, pruning, cleanup with policy enforcement.
 
 Single abstraction for single-mode (ad-hoc) and batch (retention) workflows.
@@ -26,9 +26,9 @@ class ArchiveError(ValueError):
 
 
 def extract_group_prefix(filename: str) -> Optional[str]:
-    """Extract group prefix from filename, e.g., 'tests' from 'tests_all_code_dump_*.md'."""
-    # Match pattern like {group}_all_code_dump_{timestamp}.md
-    match = re.match(r'^(.+?)_all_code_dump_\d{8}_\d{6}\.md$', filename)
+    """Extract group prefix from filename, e.g., 'tests' from 'tests_all_create_dump_*.md'."""
+    # Match pattern like {group}_all_create_dump_{timestamp}.md
+    match = re.match(r'^(.+?)_all_create_dump_\d{8}_\d{6}\.md$', filename)
     if match:
         group = match.group(1)
         # Validate group is simple (no path chars, etc.)
@@ -70,7 +70,7 @@ class ArchiveManager:
         # NEW: Enforce canonical pattern from config
         cfg = load_config()
         self.md_pattern = md_pattern or cfg.dump_pattern
-        if md_pattern and not re.match(r'.*_all_code_dump_', self.md_pattern):
+        if md_pattern and not re.match(r'.*_all_create_dump_', self.md_pattern):
             logger.warning("Loose md_pattern provided; enforcing canonical: %s", DEFAULT_DUMP_PATTERN)
             self.md_pattern = DEFAULT_DUMP_PATTERN
         self.archive_all = archive_all  # New flag
@@ -78,7 +78,7 @@ class ArchiveManager:
         self.archives_dir.mkdir(exist_ok=True)
         self.quarantine_dir = self.archives_dir / "quarantine"
         self.quarantine_dir.mkdir(exist_ok=True)
-        self.prefix = f"{self.root.name}_all_code_dump_"
+        self.prefix = f"{self.root.name}_all_create_dump_"
 
 
     @staticmethod
@@ -337,8 +337,8 @@ class ArchiveManager:
             if self.verbose:
                 logger.info("Archiving %d pairs (%d files) for group %s", num_historical_pairs, num_files, group)
 
-            # ZIP name: {group}_all_code_dump_{timestamp}.zip
-            base_archive_name = f"{group}_all_code_dump_{self.timestamp}.zip"
+            # ZIP name: {group}_all_create_dump_{timestamp}.zip
+            base_archive_name = f"{group}_all_create_dump_{self.timestamp}.zip"
             if self.dry_run:
                 logger.info("[dry-run] Would create archive ZIP for %s: %s", group, base_archive_name)
                 archive_path = None
@@ -395,7 +395,7 @@ class ArchiveManager:
         if self.keep_last is None:
             return
         # 🐞 FIX: Strict regex for dump ZIPs only
-        zip_pattern = re.compile(r".*_all_code_dump_\d{8}_\d{6}\.zip$")
+        zip_pattern = re.compile(r".*_all_create_dump_\d{8}_\d{6}\.zip$")
         archive_zips = [p for p in self.archives_dir.rglob("*") if zip_pattern.match(p.name)]
         num_to_keep = self.keep_last
         if len(archive_zips) > num_to_keep:

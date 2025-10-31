@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock
 import logging
 
-from code_dump.path_utils import safe_is_within, find_matching_files, confirm
+from create_dump.path_utils import safe_is_within, find_matching_files, confirm
 
 
 @pytest.fixture
@@ -31,15 +31,15 @@ def test_safe_is_within_except(mock_root: Path):
 
 
 def test_find_matching_files(mock_root: Path):
-    (mock_root / "test_code_dump.md").touch()
-    results = find_matching_files(mock_root, r".*code_dump.*\.md$")
+    (mock_root / "test_create_dump.md").touch()
+    results = find_matching_files(mock_root, r".*create_dump.*\.md$")
     assert len(results) == 1
-    assert "test_code_dump.md" in results[0].name
+    assert "test_create_dump.md" in results[0].name
 
 
 def test_find_matching_files_empty(mock_root: Path):
     with patch("pathlib.Path.rglob", return_value=[]):
-        matches = find_matching_files(mock_root, r".*code_dump.*\.md$")
+        matches = find_matching_files(mock_root, r".*create_dump.*\.md$")
     assert matches == []
 
 

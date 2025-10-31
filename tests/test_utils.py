@@ -9,7 +9,7 @@ import subprocess
 import signal
 from unittest.mock import ANY
 
-from code_dump.utils import (
+from create_dump.utils import (
     slugify,
     get_language,
     is_text_file,
@@ -82,7 +82,7 @@ def test_get_git_meta_success(mock_check_output):
 @patch("subprocess.check_output")
 def test_get_git_meta_failure(mock_check_output, tmp_path: Path):
     mock_check_output.side_effect = subprocess.CalledProcessError(1, ["git"])
-    with patch("code_dump.utils.logger.debug") as mock_log:
+    with patch("create_dump.utils.logger.debug") as mock_log:
         meta = get_git_meta(tmp_path)
         mock_log.assert_called_once()  # Covers debug log (242-243)
     assert meta is None
@@ -125,7 +125,7 @@ def test_version():
     assert VERSION == "6.0.0"
 
 
-@patch("code_dump.utils.HAS_RICH", False)  # Force fallback (72-73)
+@patch("create_dump.utils.HAS_RICH", False)  # Force fallback (72-73)
 def test_styled_print_fallback(capsys):
     styled_print("[red]Test[/red]", nl=False)
     captured = capsys.readouterr()
@@ -133,23 +133,23 @@ def test_styled_print_fallback(capsys):
 
 
 def test_metrics_server_finally():
-    with patch("code_dump.utils.start_http_server") as mock_start:  # Local binding
+    with patch("create_dump.utils.start_http_server") as mock_start:  # Local binding
         with metrics_server(8000):
             pass  # Enter/exit
         mock_start.assert_called_once_with(8000)  # Covers entry; unwind hits finally (99-102)
 
 
 def test_cleanup_handler_init():
-    with patch("code_dump.utils.signal.signal") as mock_signal, \
-         patch("code_dump.utils.atexit.register") as mock_atexit:
+    with patch("create_dump.utils.signal.signal") as mock_signal, \
+         patch("create_dump.utils.atexit.register") as mock_atexit:
         handler = CleanupHandler()
         mock_signal.assert_any_call(signal.SIGINT, ANY)  # Covers 116-120
         mock_signal.assert_any_call(signal.SIGTERM, ANY)
         mock_atexit.assert_called_once_with(handler._cleanup)
 
 
-@patch("code_dump.utils.sys.exit")
-@patch("code_dump.utils.logger.info")
+@patch("create_dump.utils.sys.exit")
+@patch("create_dump.utils.logger.info")
 def test_cleanup_handler_signal(mock_log, mock_exit):
     handler = CleanupHandler()
     with patch.object(handler, "_cleanup"):
@@ -164,8 +164,8 @@ def test_cleanup_handler_signal(mock_log, mock_exit):
 def test_cleanup_handler_cleanup():
     mock_temp_dir = MagicMock()
     mock_stack = MagicMock(close=MagicMock())
-    with patch("code_dump.utils._temp_dir", mock_temp_dir), \
-         patch("code_dump.utils._cleanup_stack", mock_stack):
+    with patch("create_dump.utils._temp_dir", mock_temp_dir), \
+         patch("create_dump.utils._cleanup_stack", mock_stack):
         handler = CleanupHandler()
         handler._cleanup()  # Covers 138-140
         mock_temp_dir.cleanup.assert_called_once()

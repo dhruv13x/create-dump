@@ -5,16 +5,16 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
-from code_dump.archiver import extract_group_prefix, _safe_arcname, ArchiveManager
+from create_dump.archiver import extract_group_prefix, _safe_arcname, ArchiveManager
 
 
 @pytest.mark.parametrize(
     "filename, expected",
     [
-        ("tests_all_code_dump_20251028_042000.md", "tests"),
-        ("src_all_code_dump_20251028_042000.md", "src"),
-        ("root_all_code_dump_20251028_042000.md", "root"),
-        ("a_b-c_all_code_dump_20251028_042000.md", "a_b-c"),  # Valid chars
+        ("tests_all_create_dump_20251028_042000.md", "tests"),
+        ("src_all_create_dump_20251028_042000.md", "src"),
+        ("root_all_create_dump_20251028_042000.md", "root"),
+        ("a_b-c_all_create_dump_20251028_042000.md", "a_b-c"),  # Valid chars
     ],
 )
 def test_extract_group_prefix_valid(filename, expected):
@@ -24,13 +24,13 @@ def test_extract_group_prefix_valid(filename, expected):
 @pytest.mark.parametrize(
     "filename",
     [
-        "invalid!_all_code_dump_20251028_042000.md",  # Invalid char !
-        "no_prefix_code_dump_20251028_042000.md",  # No _all_code_dump_
-        "all_code_dump_20251028_042000.md",  # Empty group
-        "longgroupwithpath/dir_all_code_dump_20251028_042000.md",  # Path chars /
-        "_all_code_dump_20251028_042000.md",  # Leading _
-        "group_all_code_dump_20251028_04.md",  # Malformed TS
-        "group_all_code_dump_20251028_042000.txt",  # Wrong ext
+        "invalid!_all_create_dump_20251028_042000.md",  # Invalid char !
+        "no_prefix_create_dump_20251028_042000.md",  # No _all_create_dump_
+        "all_create_dump_20251028_042000.md",  # Empty group
+        "longgroupwithpath/dir_all_create_dump_20251028_042000.md",  # Path chars /
+        "_all_create_dump_20251028_042000.md",  # Leading _
+        "group_all_create_dump_20251028_04.md",  # Malformed TS
+        "group_all_create_dump_20251028_042000.txt",  # Wrong ext
     ],
 )
 def test_extract_group_prefix_invalid(filename):
@@ -45,8 +45,8 @@ def test_extract_group_prefix_empty():
 @pytest.mark.parametrize(
     "filename, expected",
     [
-        ("test_all_code_dump_20251028_040020.md", datetime(2025, 10, 28, 4, 0, 20)),
-        ("group_all_code_dump_20251028_042000.md", datetime(2025, 10, 28, 4, 20, 0)),
+        ("test_all_create_dump_20251028_040020.md", datetime(2025, 10, 28, 4, 0, 20)),
+        ("group_all_create_dump_20251028_042000.md", datetime(2025, 10, 28, 4, 20, 0)),
     ],
 )
 def test_extract_timestamp_valid(filename, expected):
@@ -56,13 +56,13 @@ def test_extract_timestamp_valid(filename, expected):
 @pytest.mark.parametrize(
     "filename",
     [
-        "test_all_code_dump_20251028_04.md",  # Short TS: no match
-        "test_all_code_dump_invalid_ts.md",  # No match
+        "test_all_create_dump_20251028_04.md",  # Short TS: no match
+        "test_all_create_dump_invalid_ts.md",  # No match
         "malformed_2025-10-28_04:20:00.md",  # No match
     ],
 )
 def test_extract_timestamp_no_match(filename):
-    with patch('code_dump.archiver.logger.warning') as mock_warn:
+    with patch('create_dump.archiver.logger.warning') as mock_warn:
         ts = ArchiveManager.extract_timestamp(filename)
         assert ts == datetime.min
         mock_warn.assert_not_called()  # Silent fallback, no warn
@@ -71,12 +71,12 @@ def test_extract_timestamp_no_match(filename):
 @pytest.mark.parametrize(
     "filename",
     [
-        "test_all_code_dump_20251328_042000.md",  # Match, invalid month=13 → ValueError + warn
-        "test_all_code_dump_20251028_252000.md",  # Match, invalid hour=25 → ValueError + warn
+        "test_all_create_dump_20251328_042000.md",  # Match, invalid month=13 → ValueError + warn
+        "test_all_create_dump_20251028_252000.md",  # Match, invalid hour=25 → ValueError + warn
     ],
 )
 def test_extract_timestamp_bad_parse(filename):
-    with patch('code_dump.archiver.logger.warning') as mock_warn:
+    with patch('create_dump.archiver.logger.warning') as mock_warn:
         ts = ArchiveManager.extract_timestamp(filename)
         assert ts == datetime.min
         mock_warn.assert_called_once_with("Malformed timestamp in filename: %s", filename)

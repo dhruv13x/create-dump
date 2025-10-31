@@ -1,4 +1,4 @@
-# src/code_dump/writer.py
+# src/create_dump/writer.py
 """Markdown writing and checksum logic.
 
 Streaming, concurrent-safe output generation.

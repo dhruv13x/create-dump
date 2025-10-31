@@ -90,7 +90,7 @@ def run_batch(
     cfg = load_config()  # NEW: Load early for pattern access
     
     # 🐞 Enforce canonical pattern if provided is loose
-    canonical_prefix = r'.*_all_code_dump_'
+    canonical_prefix = r'.*_all_create_dump_'
     if not re.match(canonical_prefix, pattern):
         logger.warning("Loose pattern detected; enforcing canonical: %s", cfg.dump_pattern)
         pattern = cfg.dump_pattern

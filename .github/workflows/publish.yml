@@ -6,13 +6,14 @@ on:
       - 'v*.*.*'  # Semantic tags only
 
 permissions:
-  contents: read  # Minimal for checkout
+  contents: read
+  id-token: write  # OIDC for Trusted Publishing
 
 jobs:
   build:
     name: Build and publish
     runs-on: ubuntu-latest
-    environment: pypi  # Protects with review/required approvers
+    environment: pypi  # Gated approval (configure reviewers in Settings > Environments)
 
     steps:
     - name: Checkout source
@@ -23,18 +24,17 @@ jobs:
       with:
         python-version: '3.12'
 
-    - name: Install Hatchling
-      run: pip install hatchling
+    - name: Install build tools
+      run: pip install hatchling build twine
 
     - name: Build package
-      run: python -m hatch build  # Generates dist/*.tar.gz and *.whl
+      run: python -m build  # Hatchling-backed; outputs dist/*.tar.gz *.whl
 
     - name: Verify build
-      run: |
-        twine check dist/*  # Requires: pip install twine
+      run: twine check dist/*
 
     - name: Publish to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
         verbose: true
-        skip-existing: true  # Idempotent: Skip if version exists
+        skip-existing: true  # Idempotent for retries

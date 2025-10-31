@@ -1,4 +1,4 @@
-# src/code_dump/utils.py
+# src/create_dump/utils.py
 """
 Shared utilities: Logging, metrics, helpers.
 
@@ -27,7 +27,7 @@ from pathspec.patterns.gitwildmatch import GitWildMatchPatternError
 from prometheus_client import Counter, Histogram, start_http_server
 
 # Define logger EARLY to avoid circular imports
-logger = structlog.get_logger("code_dump")
+logger = structlog.get_logger("create_dump")
 
 # NOW import core (after logger is defined)
 from .core import Config, GitMeta
@@ -46,12 +46,12 @@ DEFAULT_METRICS_PORT = 8000
 
 # Metrics
 DUMP_DURATION = Histogram(
-    "code_dump_duration_seconds",
+    "create_dump_duration_seconds",
     "Dump duration",
     buckets=[1, 5, 30, 60, 300, float("inf")],
 )
-FILES_PROCESSED = Counter("code_dump_files_total", "Files processed", ["status"])
-ERRORS_TOTAL = Counter("code_dump_errors_total", "Errors encountered", ["type"])
+FILES_PROCESSED = Counter("create_dump_files_total", "Files processed", ["status"])
+ERRORS_TOTAL = Counter("create_dump_errors_total", "Errors encountered", ["type"])
 
 # Globals for cleanup (thread-safe via ExitStack)
 _cleanup_stack = ExitStack()
