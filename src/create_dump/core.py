@@ -16,7 +16,7 @@ from .utils import logger
 import toml
 
 # Canonical pattern for dump artifacts (imported/used by modules)
-DEFAULT_DUMP_PATTERN = r".*_all_code_dump_\d{8}_\d{6}\.(md(\.gz)?|sha256)$"  # NEW: Strict brandmark regex
+DEFAULT_DUMP_PATTERN = r".*_all_create_dump_\d{8}_\d{6}\.(md(\.gz)?|sha256)$"  # NEW: Strict brandmark regex
 
 
 class Config(BaseModel):
@@ -77,7 +77,7 @@ class Config(BaseModel):
     @classmethod
     def validate_dump_pattern(cls, v):
         """Ensure pattern is non-empty and warn on loose matches."""
-        if not v or not re.match(r'.*_all_code_dump_', v):  # Basic sanity
+        if not v or not re.match(r'.*_all_create_dump_', v):  # Basic sanity
             logger.warning("Loose or invalid dump_pattern '%s'; enforcing default: %s", v, DEFAULT_DUMP_PATTERN)
             return DEFAULT_DUMP_PATTERN
         return v

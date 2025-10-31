@@ -134,7 +134,7 @@ def test_cli_batch_archive(mock_logging, mock_manager, tmp_path: Path):
         'dry_run': True,
         'yes': False,
         'verbose': False,
-        'md_pattern': r'.*_all_code_dump_\d{8}_\d{6}\.(md(\.gz)?)$',
+        'md_pattern': r'.*_all_create_dump_\d{8}_\d{6}\.(md(\.gz)?)$',
         'archive_all': False
     }
     mock_manager_instance.run.assert_called_once()

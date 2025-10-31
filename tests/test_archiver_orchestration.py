@@ -26,7 +26,7 @@ class TestCentralizeOutputs:
         sub1 = mock_root / "sub1"
         sub1.mkdir()
         suffix = ".gz" if compress else ""
-        filename = f"bot_platform_all_code_dump_20251030_133140.md{suffix}"
+        filename = f"bot_platform_all_create_dump_20251030_133140.md{suffix}"
         md1 = sub1 / filename
         md1.write_text("md1")
         dest_dir = mock_root / "archives"
@@ -43,10 +43,10 @@ class TestCentralizeOutputs:
     def test_md_sha(self, mock_root: Path):
         sub1 = mock_root / "sub1"
         sub1.mkdir()
-        filename = "bot_platform_all_code_dump_20251030_133140.md"
+        filename = "bot_platform_all_create_dump_20251030_133140.md"
         md1 = sub1 / filename
         md1.write_text("md1")
-        sha_filename = "bot_platform_all_code_dump_20251030_133140.sha256"
+        sha_filename = "bot_platform_all_create_dump_20251030_133140.sha256"
         sha1 = sub1 / sha_filename
         sha1.write_text("sha1")
         dest_dir = mock_root / "archives"
@@ -64,10 +64,10 @@ class TestCentralizeOutputs:
     def test_compress(self, mock_root: Path):
         sub1 = mock_root / "sub1"
         sub1.mkdir()
-        filename = "bot_platform_all_code_dump_20251030_133140.md.gz"
+        filename = "bot_platform_all_create_dump_20251030_133140.md.gz"
         md1 = sub1 / filename
         md1.write_text("gz1")
-        sha_filename = "bot_platform_all_code_dump_20251030_133140.sha256"
+        sha_filename = "bot_platform_all_create_dump_20251030_133140.sha256"
         sha1 = sub1 / sha_filename
         sha1.write_text("sha1")
         dest_dir = mock_root / "archives"
@@ -85,7 +85,7 @@ class TestCentralizeOutputs:
     def test_test_unsafe_skip(self, mock_root: Path):
         sub1 = mock_root / "sub1"
         sub1.mkdir()
-        filename = "bot_platform_all_code_dump_20251030_133140.md"
+        filename = "bot_platform_all_create_dump_20251030_133140.md"
         md1 = sub1 / filename
         md1.write_text("unsafe")
         with patch("create_dump.orchestrator.safe_is_within") as mock_within, \
@@ -101,7 +101,7 @@ class TestCentralizeOutputs:
     def test_overwrite(self, mock_root: Path):
         archives_dir = mock_root / "archives"
         archives_dir.mkdir()
-        filename = "bot_platform_all_code_dump_20251030_133140.md"
+        filename = "bot_platform_all_create_dump_20251030_133140.md"
         target_md = archives_dir / filename
         target_md.write_text("old")
         sub1 = mock_root / "sub1"
@@ -119,7 +119,7 @@ class TestCentralizeOutputs:
 
 class TestRunBatch:
     def test_no_sub_roots(self, mock_root: Path):
-        canonical_pattern = r".*_all_code_dump_.*"
+        canonical_pattern = r".*_all_create_dump_.*"
         with patch("create_dump.orchestrator.load_config") as mock_load:
             mock_load.return_value.dump_pattern = canonical_pattern
             with patch("create_dump.orchestrator.logger.warning") as mock_warn:
@@ -139,7 +139,7 @@ class TestRunBatch:
 
     @pytest.mark.parametrize("pattern,expected_pattern", [
         (r".*dump.*", r".*dump.*"),
-        (r".*_all_code_dump_.*", r".*_all_code_dump_.*"),
+        (r".*_all_create_dump_.*", r".*_all_create_dump_.*"),
     ])
     def test_pre_cleanup(self, mock_root: Path, pattern: str, expected_pattern: str):
         sub1 = mock_root / "sub1"
@@ -253,7 +253,7 @@ class TestRunBatch:
             )
             mock_find.assert_called_once_with(mock_root, r".*dump.*")
 
-    @pytest.mark.parametrize("pattern", [r".*", r".*_all_code_dump_.*"])
+    @pytest.mark.parametrize("pattern", [r".*", r".*_all_create_dump_.*"])
     def test_success(self, mock_root: Path, pattern: str):
         sub1 = mock_root / "sub1"
         sub1.mkdir()
@@ -266,7 +266,7 @@ class TestRunBatch:
              patch("create_dump.orchestrator.find_matching_files") as mock_find:
             mock_find.return_value = []
             mock_cfg = MagicMock(max_file_size_kb=100, use_gitignore=True, git_meta=True)
-            mock_cfg.dump_pattern = pattern if re.match(r'.*_all_code_dump_', pattern) else pattern
+            mock_cfg.dump_pattern = pattern if re.match(r'.*_all_create_dump_', pattern) else pattern
             mock_load.return_value = mock_cfg
             mock_run_single.return_value = None
             mock_time.return_value.__enter__.return_value = None
@@ -283,7 +283,7 @@ class TestRunBatch:
                 verbose=True,
                 quiet=False,
             )
-            expected_pattern = pattern if re.match(r'.*_all_code_dump_', pattern) else mock_cfg.dump_pattern
+            expected_pattern = pattern if re.match(r'.*_all_create_dump_', pattern) else mock_cfg.dump_pattern
             mock_find.assert_called_once_with(mock_root, expected_pattern)
             mock_run_single.assert_called_once_with(
                 root=sub1,

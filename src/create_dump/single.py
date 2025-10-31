@@ -99,7 +99,7 @@ def run_single(
     # Resolve outfile early for prompt (NEW: Uses dest/output logic)
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     foldername = root.name or "project"
-    branded_name = Path(f"{foldername}_all_code_dump_{timestamp}.md")
+    branded_name = Path(f"{foldername}_all_create_dump_{timestamp}.md")
     output_dest = root  # Default
     if dest:
         output_dest = dest.resolve()

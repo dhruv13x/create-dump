@@ -22,9 +22,9 @@ def mock_root(tmp_path: Path):
 
 
 def test_find_dump_pairs_valid_pair(mock_root: Path):
-    md = mock_root / "bot_platform_all_code_dump_20251028_041000.md"
+    md = mock_root / "bot_platform_all_create_dump_20251028_041000.md"
     md.touch()
-    sha = mock_root / "bot_platform_all_code_dump_20251028_041000.sha256"
+    sha = mock_root / "bot_platform_all_create_dump_20251028_041000.sha256"
     sha.touch()
     manager = ArchiveManager(mock_root, "20251028_042000")
     pairs = manager.find_dump_pairs()
@@ -34,7 +34,7 @@ def test_find_dump_pairs_valid_pair(mock_root: Path):
 
 
 def test_find_dump_pairs_orphan_quarantine(mock_root: Path):
-    orphan_md = mock_root / "orphan_bot_platform_all_code_dump_20251028_041000.md"
+    orphan_md = mock_root / "orphan_bot_platform_all_create_dump_20251028_041000.md"
     orphan_md.touch()
     manager = ArchiveManager(mock_root, "20251028_042000")
     pairs = manager.find_dump_pairs()
@@ -45,7 +45,7 @@ def test_find_dump_pairs_orphan_quarantine(mock_root: Path):
 
 
 def test_find_dump_pairs_dry_run_orphan(mock_root: Path):
-    orphan_md = mock_root / "orphan_bot_platform_all_code_dump_20251028_041000.md"
+    orphan_md = mock_root / "orphan_bot_platform_all_create_dump_20251028_041000.md"
     orphan_md.touch()
     manager = ArchiveManager(mock_root, "20251028_042000", dry_run=True)
     with patch.object(logger, "warning") as mock_warn:
@@ -56,7 +56,7 @@ def test_find_dump_pairs_dry_run_orphan(mock_root: Path):
 
 
 def test_find_dump_pairs_non_md_skip_verbose(mock_root: Path):
-    non_md = mock_root / "bot_platform_all_code_dump_20251028_041000.sha256"  # Matches pattern, !.md → skip log
+    non_md = mock_root / "bot_platform_all_create_dump_20251028_041000.sha256"  # Matches pattern, !.md → skip log
     non_md.touch()
     manager = ArchiveManager(mock_root, "20251028_042000", verbose=True)
     with patch.object(logger, "debug") as mock_debug:
@@ -133,7 +133,7 @@ def test_prune_old_archives(mock_root: Path):
     # Create 5 zips, old to new, with mtime
     for i in range(5):
         ts = f"{i:02d}0000"  # e.g., 000000, 010000 (6 digits)
-        p = archives_dir / f"bot_platform_all_code_dump_20251028_{ts}.zip"
+        p = archives_dir / f"bot_platform_all_create_dump_20251028_{ts}.zip"
         p.touch()
         os.utime(p, (time.time() - (4 - i) * 3600, ) * 2)  # Older for lower i
     manager = ArchiveManager(mock_root, "20251028_042000", keep_last=3)
@@ -156,7 +156,7 @@ def test_prune_old_archives_verbose(mock_root: Path):
     archives_dir = mock_root / "archives"
     archives_dir.mkdir()
     ts = "000000"  # 6 digits
-    old_zip = archives_dir / f"bot_platform_all_code_dump_20251028_{ts}.zip"
+    old_zip = archives_dir / f"bot_platform_all_create_dump_20251028_{ts}.zip"
     old_zip.touch()
     manager = ArchiveManager(mock_root, "20251028_042000", keep_last=0, verbose=True)
     with patch("create_dump.archiver.safe_delete_paths", return_value=(1, 0)), \
@@ -170,7 +170,7 @@ def test_find_dump_pairs_recursive(mock_root: Path):
     subdir = mock_root / "sub"
     subdir.mkdir()
     ts_str = "20251028_041000"
-    md = subdir / f"bot_platform_all_code_dump_{ts_str}.md"
+    md = subdir / f"bot_platform_all_create_dump_{ts_str}.md"
     md.touch()
     sha = md.with_suffix(".sha256")
     sha.touch()
@@ -186,7 +186,7 @@ def test_find_dump_pairs_recursive_orphan(mock_root: Path):
     subdir = mock_root / "sub"
     subdir.mkdir()
     ts_str = "20251028_041000"
-    md = subdir / f"bot_platform_all_code_dump_{ts_str}.md"
+    md = subdir / f"bot_platform_all_create_dump_{ts_str}.md"
     md.touch()  # No sha
     manager = ArchiveManager(mock_root, "20251028_042000", search=True)
     pairs = manager.find_dump_pairs()
@@ -199,7 +199,7 @@ def test_find_dump_pairs_recursive_orphan(mock_root: Path):
 def test_find_dump_pairs_verbose_found(mock_root: Path):
     """Cover line 135: verbose 'Found %d pairs' log."""
     ts_str = "20251028_041000"
-    md = mock_root / f"bot_platform_all_code_dump_{ts_str}.md"
+    md = mock_root / f"bot_platform_all_create_dump_{ts_str}.md"
     md.touch()
     sha = md.with_suffix(".sha256")
     sha.touch()
@@ -229,9 +229,9 @@ class TestArchiveHandles:
     @pytest.fixture
     def sample_pairs(self, mock_root: Path):
         ts1, ts2 = "20251028_040020", "20251028_040021"  # ts2 newer
-        md1 = mock_root / f"bot_platform_all_code_dump_{ts1}.md"
+        md1 = mock_root / f"bot_platform_all_create_dump_{ts1}.md"
         sha1 = md1.with_suffix(".sha256")
-        md2 = mock_root / f"bot_platform_all_code_dump_{ts2}.md"
+        md2 = mock_root / f"bot_platform_all_create_dump_{ts2}.md"
         sha2 = md2.with_suffix(".sha256")
         md1.touch(); sha1.touch(); md2.touch(); sha2.touch()
         return [(md1, sha1), (md2, sha2)]
@@ -304,11 +304,11 @@ class TestHandleGroupedArchives:
     @pytest.fixture
     def sample_groups(self, mock_root: Path):
         ts1, ts2 = "20251030_040020", "20251030_040021"  # ts2 newer for live selection
-        md_src1 = mock_root / f"src_all_code_dump_{ts1}.md"
+        md_src1 = mock_root / f"src_all_create_dump_{ts1}.md"
         sha_src1 = md_src1.with_suffix(".sha256")
-        md_src2 = mock_root / f"src_all_code_dump_{ts2}.md"
+        md_src2 = mock_root / f"src_all_create_dump_{ts2}.md"
         sha_src2 = md_src2.with_suffix(".sha256")
-        md_default = mock_root / f"all_code_dump_{ts1}.md"
+        md_default = mock_root / f"all_create_dump_{ts1}.md"
         sha_default = md_default.with_suffix(".sha256")
 
         md_src1.touch(); sha_src1.touch()

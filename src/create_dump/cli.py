@@ -267,7 +267,7 @@ def clean(
 def archive(
     # Core Arguments
     root: Path = typer.Argument(Path("."), help="Root project path."),
-    pattern: str = typer.Argument(r".*_all_code_dump_\d{8}_\d{6}\.(md(\.gz)?)$", help="Regex for MD dumps [default: canonical MD subset]."),
+    pattern: str = typer.Argument(r".*_all_create_dump_\d{8}_\d{6}\.(md(\.gz)?)$", help="Regex for MD dumps [default: canonical MD subset]."),
 
     # Archiving (Unified; elevated as primary focus)
     archive_search: bool = typer.Option(False, "--archive-search", help="Recursive search for dumps [default: false]."),

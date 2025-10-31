@@ -467,7 +467,7 @@ class TestRunSingle:
             mock_collector.return_value.collect.return_value = ["test.py"]
             # Mock unique to return predictable branded for prompt assert
             with patch("create_dump.single._unique_path") as mock_unique:
-                mock_unique.return_value = Path("project_all_code_dump_20251030_172000.md")  # Static for assert
+                mock_unique.return_value = Path("project_all_create_dump_20251030_172000.md")  # Static for assert
                 run_single(
                     root=mock_root,
                     dry_run=False,
@@ -663,7 +663,7 @@ class TestRunSingle:
             )
             # FIXED: Assert inside patch scope; call count & prefix
             assert len(mock_unique.call_args_list) == 2  # Prompt      outfile
-            branded_prefix = f"{mock_root.name}_all_code_dump_"
+            branded_prefix = f"{mock_root.name}_all_create_dump_"
             for call_arg in mock_unique.call_args_list:
                 arg_path = call_arg.args[0]
                 assert arg_path.parent == dest_dir  # Under dest

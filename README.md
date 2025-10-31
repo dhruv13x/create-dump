@@ -29,7 +29,7 @@ create-dump single --dest ./dumps/my-snapshot.md
 create-dump batch --root ./monorepo --archive --keep-last 5
 ```
 
-Output: A self-contained Markdown file (`my-snapshot_all_code_dump_YYYYMMDD_HHMMSS.md`) with TOC, fenced code blocks, and `.sha256` checksum.
+Output: A self-contained Markdown file (`my-snapshot_all_create_dump_YYYYMMDD_HHMMSS.md`) with TOC, fenced code blocks, and `.sha256` checksum.
 
 ## ✨ Features
 
@@ -86,7 +86,7 @@ use_gitignore = true
 git_meta = true
 max_file_size_kb = 5000
 dest = "/path/to/dumps"  # Default output dir
-dump_pattern = ".*_all_code_dump_\\d{8}_\\d{6}\\.(md(\\.gz)?|sha256)$"
+dump_pattern = ".*_all_create_dump_\\d{8}_\\d{6}\\.(md(\\.gz)?|sha256)$"
 excluded_dirs = ["__pycache__", ".git", ".venv", "node_modules"]
 metrics_port = 8000
 ```
@@ -132,7 +132,7 @@ create-dump batch --archive-all --keep-latest
 5. Cleanup temps/SHAs (configurable).
 
 **Output Artifacts**:
-- `project_all_code_dump_YYYYMMDD_HHMMSS.md`: Main dump.
+- `project_all_create_dump_YYYYMMDD_HHMMSS.md`: Main dump.
 - `.sha256`: Integrity checksum.
 - `archives/project_YYYYMMDD_HHMMSS.zip`: Compressed archive.
 

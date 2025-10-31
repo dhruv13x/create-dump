@@ -26,9 +26,9 @@ def sample_pairs(mock_root: Path, pairs_count: int):
          ts_hh = f"0{i:02d}"
          ts_mmss = "0020"  # Fixed for determinism
          ts_str = f"20251028_{ts_hh}{ts_mmss}"  # Full 8+6 digits
-         md = mock_root / f"bot_platform_all_code_dump_{ts_str}.md"  # Canonical prefix
+         md = mock_root / f"bot_platform_all_create_dump_{ts_str}.md"  # Canonical prefix
          md.write_text(f"content {i}")
-         sha = mock_root / f"bot_platform_all_code_dump_{ts_str}.sha256"
+         sha = mock_root / f"bot_platform_all_create_dump_{ts_str}.sha256"
          sha.write_text("abc123")
          mtime = time.time() - i  # Newer → lower i
          os.utime(md, (mtime, mtime))
@@ -78,12 +78,12 @@ def test_manager_bundling(mock_root: Path, pairs_count: int):
 
 def test_manager_orphan_warn(mock_root: Path):
     ts_str = "20251028_040020"
-    md_orphan = mock_root / f"test_all_code_dump_{ts_str}.md"
+    md_orphan = mock_root / f"test_all_create_dump_{ts_str}.md"
     md_orphan.write_text("content")  # Create file
     # Valid pair
-    md_valid = mock_root / f"test_all_code_dump_20251028_040021.md"
+    md_valid = mock_root / f"test_all_create_dump_20251028_040021.md"
     md_valid.write_text("valid")
-    sha = mock_root / f"test_all_code_dump_20251028_040021.sha256"
+    sha = mock_root / f"test_all_create_dump_20251028_040021.sha256"
     sha.write_text("abc")
 
     timestamp = "20251028_045000"
@@ -98,14 +98,14 @@ def test_manager_orphan_warn(mock_root: Path):
 
 def test_manager_invalid_path_skip(mock_root: Path):
      ts_str = "20251028_040020"
-     md_valid = mock_root / f"bot_platform_all_code_dump_{ts_str}.md"  # Canonical: matches md_regex exactly
+     md_valid = mock_root / f"bot_platform_all_create_dump_{ts_str}.md"  # Canonical: matches md_regex exactly
      md_valid.write_text("valid")
-     sha = mock_root / f"bot_platform_all_code_dump_{ts_str}.sha256"
+     sha = mock_root / f"bot_platform_all_create_dump_{ts_str}.sha256"
      sha.write_text("abc")
      # Invalid outside root
      invalid_root = mock_root.parent / "invalid"
      invalid_root.mkdir()
-     md_invalid = invalid_root / f"bot_platform_all_code_dump_invalid_{ts_str}.md"  # Still outside → skipped
+     md_invalid = invalid_root / f"bot_platform_all_create_dump_invalid_{ts_str}.md"  # Still outside → skipped
      md_invalid.write_text("invalid")
 
      timestamp = "20251028_045000"
@@ -120,9 +120,9 @@ def test_manager_invalid_path_skip(mock_root: Path):
 
 def test_manager_dry_run_archive(mock_root: Path):
     ts_str = "20251028_040020"
-    md = mock_root / f"test_all_code_dump_test_{ts_str}.md"
+    md = mock_root / f"test_all_create_dump_test_{ts_str}.md"
     md.write_text("test")
-    sha = mock_root / f"test_all_code_dump_test_{ts_str}.sha256"
+    sha = mock_root / f"test_all_create_dump_test_{ts_str}.sha256"
     sha.write_text("abc")
 
     timestamp = "20251028_045000"
@@ -140,9 +140,9 @@ def test_manager_clean_root_confirm(mock_root: Path):
     to_delete = []
     for i in range(2):
         ts_str = f"{ts_base}{i:02d}20"
-        md = mock_root / f"test_all_code_dump_test_{ts_str}.md"
+        md = mock_root / f"test_all_create_dump_test_{ts_str}.md"
         md.write_text(f"test {i}")
-        sha = mock_root / f"test_all_code_dump_test_{ts_str}.sha256"
+        sha = mock_root / f"test_all_create_dump_test_{ts_str}.sha256"
         sha.write_text(f"abc{i}")
         to_delete.extend([md, sha])
 
@@ -167,7 +167,7 @@ def test_manager_prune_basic(mock_root: Path):
 
     for i in range(5):
         ts = f"20251028_{i:02d}0000"
-        zipf = archives_dir / f"{mock_root.name}_all_code_dump_{ts}.zip"
+        zipf = archives_dir / f"{mock_root.name}_all_create_dump_{ts}.zip"
         zipf.touch()
         os.utime(zipf, (time.time() - (4 - i) * 86400, ) * 2)
 
@@ -199,7 +199,7 @@ def test_prune_none(mock_root: Path):
 def test_run_deferred_delete(mock_root: Path, archive_all, expected_prompt):
     """Cover run deferred delete/prompt branches (post-handle)."""
     ts_str = "20251028_040020"
-    md = mock_root / f"bot_platform_all_code_dump_{ts_str}.md"
+    md = mock_root / f"bot_platform_all_create_dump_{ts_str}.md"
     sha = md.with_suffix(".sha256")
     md.touch(); sha.touch()
     manager = ArchiveManager(mock_root, "20251028_045000", archive_all=archive_all, clean_root=True, no_remove=False, dry_run=False, yes=False, verbose=True)

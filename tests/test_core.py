@@ -82,8 +82,8 @@ def test_config_dest_validation(tmp_path: Path):
 
 
 def test_config_dump_pattern_validation():
-    # Valid pattern (matches _all_code_dump_)
-    valid = r".*_all_code_dump_\d{8}_\d{6}\.md$"
+    # Valid pattern (matches _all_create_dump_)
+    valid = r".*_all_create_dump_\d{8}_\d{6}\.md$"
     cfg = Config(dump_pattern=valid)
     assert cfg.dump_pattern == valid
 
@@ -184,7 +184,7 @@ def test_load_config_multiple_paths(monkeypatch, tmp_path: Path):
 def test_load_config_tool_namespace(tmp_path: Path):
     # Correct [tool.create-dump]
     pyproject = tmp_path / "pyproject.toml"
-    valid_custom_pattern = r".*_all_code_dump_custom_\d+\.md$"
+    valid_custom_pattern = r".*_all_create_dump_custom_\d+\.md$"
     # Escape for TOML: double backslashes for literal \
     toml_pattern = valid_custom_pattern.replace("\\", "\\\\")
     pyproject.write_text(
