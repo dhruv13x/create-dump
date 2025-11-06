@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "create-dump"
-version = "6.0.0"
+version = "6.1.0"
 description = "Enterprise-grade code dump utility for monorepos"
 authors = [{name = "dhruv", email = "dhruv13x@gmail.com"}]
 dependencies = [

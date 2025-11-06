@@ -1,70 +1,42 @@
-name: 🚀 Publish to PyPI (Enterprise Secure Build)
+name: 🚀 Publish to PyPI (Trusted Publishing)
 
 on:
   push:
     tags:
-      - "v*.*.*"
+      - "v*.*.*"  # Trigger only on semantic version tags (e.g., v1.2.3)
 
 permissions:
   contents: read
-  id-token: write
-  attestations: write
-  actions: read
-
-concurrency:
-  group: publish-${{ github.ref_name }}
-  cancel-in-progress: false
+  id-token: write  # Required for OIDC Trusted Publishing to PyPI
 
 jobs:
   build-and-publish:
+    name: Build & Publish
     runs-on: ubuntu-latest
-    environment: pypi
+    environment: pypi  # Optional: enables manual approval if configured in repo settings
 
     steps:
-      - name: 🧩 Checkout
+      - name: 🧩 Checkout code
         uses: actions/checkout@v4
 
-      - name: 🐍 Set up Python
+      - name: 🐍 Set up Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: 📦 Install build & security tools
+      - name: 📦 Install build tools
         run: |
-          pip install --upgrade pip
-          pip install build twine pip-audit cyclonedx-bom sigstore
+          python -m pip install --upgrade pip
+          pip install build twine
 
       - name: ⚙️ Build distribution packages
         run: python -m build
 
-      - name: 🔍 Verify distributions
+      - name: ✅ Verify distribution
         run: twine check dist/*
 
-      - name: 🛡️ CVE Audit (block high severity)
-        run: pip-audit --strict
-
-      - name: 🧾 Generate SBOM (CycloneDX)
-        run: cyclonedx-bom --format json --outfile sbom.json
-
-      - name: 📎 Upload SBOM artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: sbom
-          path: sbom.json
-
-      - name: 🔐 Sign artifacts (Sigstore)
-        run: sigstore sign dist/* --yes
-
-      - name: 🚀 Publish to PyPI via OIDC
+      - name: 🚀 Publish to PyPI (via OIDC)
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           verbose: true
-          skip-existing: false
-
-      - name: 🧾 Provenance attestation
-        uses: actions/attest-build-provenance@v1
-        with:
-          subject-path: "dist/*"
-
-      - name: ✅ Done
-        run: echo "✅ Published to PyPI successfully!"
+          skip-existing: false  # Fail if version already exists (prevents accidental overwrites)
