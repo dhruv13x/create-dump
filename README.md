@@ -1,5 +1,3 @@
----
-
 # create-dump
 
 [![PyPI Version](https://badge.fury.io/py/create-dump.svg)](https://badge.fury.io/py/create-dump)
@@ -10,208 +8,267 @@
 
 **Enterprise-Grade Code Dump Utility for Monorepos**
 
-`create-dump` is a robust, production-ready CLI tool designed for automated code archival in large-scale monorepos. It generates branded Markdown dumps with embedded Git metadata, integrity checksums, and configurable archiving (ZIP/GZ) while enforcing retention policies, path safety, and observability. Tailored for SRE-led environments like Telegram bot platforms, it ensures reproducible snapshots for debugging, compliance audits, and CI/CD pipelines—reducing operational toil and data loss risks.
+`create-dump` is a production-ready CLI tool for automated code archival in large-scale monorepos.  
+It generates branded Markdown dumps with Git metadata, integrity checksums, ZIP/GZ archiving,  
+retention policies, path safety, concurrency, and full observability.
 
-Built with Python 3.11+, it leverages async patterns, Pydantic validation, and Prometheus metrics for scalability and reliability. Supports single-file dumps, batch orchestration across subdirectories, and dry-run modes for safe testing.
+Designed for SRE-heavy environments (Telegram bots, microservices, monorepos), it ensures  
+**reproducible snapshots for debugging, forensics, compliance audits, and CI/CD pipelines**.
+
+Built for Python 3.11+, leveraging Pydantic, Typer, Rich, and Prometheus metrics.
+
+---
 
 ## 🚀 Quick Start
 
-Install via pip and generate a dump in seconds:
-
 ```bash
-# Install from PyPI
 pip install create-dump
 
-# Generate a single dump (defaults to current dir)
+Single dump (current directory):
+
 create-dump single --dest ./dumps/my-snapshot.md
 
-# Batch dump a monorepo with archiving
+Batch dump (monorepo):
+
 create-dump batch --root ./monorepo --archive --keep-last 5
-```
 
-Output: A self-contained Markdown file (`my-snapshot_all_create_dump_YYYYMMDD_HHMMSS.md`) with TOC, fenced code blocks, and `.sha256` checksum.
+Output example:
 
-## ✨ Features
+my-snapshot_all_create_dump_20250101_121045.md
+my-snapshot_all_create_dump_20250101_121045.md.sha256
+archives/my-snapshot_20250101_121045.zip
 
-- **Branded Markdown Generation**: Syntax-highlighted code blocks (via language detection), auto-TOC, Git branch/commit metadata, and UTC timestamps.
-- **Concurrent Processing**: Thread-pool parallelism for large repos; configurable workers with timeouts and progress bars (Rich).
-- **Integrity & Safety**: SHA256 checksums, atomic writes, path traversal guards (`safe_is_within`), and orphan quarantine.
-- **Archiving & Retention**: ZIP packaging with validation/rollback, pruning (keep-latest/N), and grouped subdir handling.
-- **Configurability**: TOML-based defaults (gitignore integration, file size limits, patterns); CLI overrides.
-- **Observability**: Prometheus metrics (files processed, errors, durations), structured logging (structlog).
-- **Testing & CI-Ready**: 93%+ coverage (pytest), Ruff/Black/Mypy enforcement, Hypothesis for fuzzing.
-- **SRE Safeguards**: Dry-run, no-remove flags, signal handling (CleanupHandler), and resource limits.
 
-| Feature | Single Mode | Batch Mode |
-|---------|-------------|------------|
-| **Scope** | Current dir/files | Recursive subdirs |
-| **Archiving** | Optional ZIP | Enforced retention |
-| **Concurrency** | Up to 8 workers | Parallel subdirs |
-| **Git Meta** | Branch/commit | Per-subdir |
+---
 
-## 📦 Installation
+✨ Features
 
-### Prerequisites
-- Python 3.11+
-- Git (for metadata; optional)
-- Optional: Redis (for future caching; stubbed)
+Branded Markdown Generation
 
-### Via PyPI (Recommended)
-```bash
+Auto TOC, language-detected code blocks, Git metadata, timestamps.
+
+
+High-Concurrency Processing
+
+Parallel workers, timeouts, progress bars (Rich).
+
+
+Safety & Integrity
+
+SHA256 hashing, atomic writes, safe path guards, orphan quarantine.
+
+
+Archiving & Retention
+
+ZIP/GZ archive, integrity validation, prune N oldest dumps.
+
+
+Configurable
+
+TOML config + CLI overrides.
+
+
+Observability
+
+Prometheus metrics (FILES_PROCESSED, ERRORS_TOTAL).
+
+
+SRE-Focused
+
+Dry-run, safe-mode, retries, cleanup handlers.
+
+
+
+Feature	Single Mode	Batch Mode
+
+Scope	Current dir/files	Recursive subdirs
+Archiving	Optional	Enforced retention
+Concurrency	Up to 8 workers	Parallel subdirs
+Git Metadata	✔️	Per-subdir ✔️
+
+
+
+---
+
+📦 Installation
+
+PyPI
+
 pip install create-dump
-```
 
-### From Source
-```bash
+From Source
+
 git clone https://github.com/dhruv/create-dump.git
 cd create-dump
-pip install -e .[dev]  # Includes testing tools
-```
+pip install -e .[dev]
 
-### Docker (For CI/Prod)
-```dockerfile
+Docker
+
 FROM python:3.12-slim
 RUN pip install create-dump
 ENTRYPOINT ["create-dump"]
-```
 
-## ⚙️ Configuration
 
-Defaults are loaded from `pyproject.toml` [tool.create-dump] section. Override via CLI or env vars.
+---
 
-### TOML Example (`pyproject.toml`)
-```toml
+⚙️ Configuration
+
+Example (pyproject.toml)
+
 [tool.create-dump]
 use_gitignore = true
 git_meta = true
 max_file_size_kb = 5000
-dest = "/path/to/dumps"  # Default output dir
+dest = "/path/to/dumps"
 dump_pattern = ".*_all_create_dump_\\d{8}_\\d{6}\\.(md(\\.gz)?|sha256)$"
 excluded_dirs = ["__pycache__", ".git", ".venv", "node_modules"]
 metrics_port = 8000
-```
 
-### CLI Overrides
-Flags take precedence; see `create-dump --help` for full options.
+Override any setting via CLI flags.
 
-## 📖 Usage
 
-### Single Mode: Ad-Hoc Dumps
-For quick snapshots of current files.
+---
 
-```bash
-# Basic dump
-create-dump single --files "src/*.py" --no-toc --progress
+📖 Usage
 
-# With Git meta and dest
-create-dump single --dest ./output.md --git-meta --include-current
+Single Mode
 
-# Dry-run validation
+create-dump single --files "src/*.py" --include-current --git-meta
 create-dump single --dry-run --verbose
-```
 
-### Batch Mode: Monorepo Orchestration
-Automated discovery and archival across subdirs.
+Batch Mode
 
-```bash
-# Full batch with pruning
-create-dump batch --root ./monorepo --keep-last 10 --clean-root --archive-all
-
-# Search recursive, exclude patterns
+create-dump batch --root ./monorepo --keep-last 10 --archive-all
 create-dump batch --search --exclude "tests/**" --max-size 10MB
 
-# Grouped archiving (e.g., src/tests)
-create-dump batch --archive-all --keep-latest
-```
 
-### Archiving Workflow
-1. Discover MD/SHA pairs via regex pattern.
-2. Group by prefix (e.g., `src_`, `tests_`).
-3. ZIP with deflation (text) / store (binaries); validate integrity.
-4. Prune historicals (keep N latest); quarantine orphans.
-5. Cleanup temps/SHAs (configurable).
+---
 
-**Output Artifacts**:
-- `project_all_create_dump_YYYYMMDD_HHMMSS.md`: Main dump.
-- `.sha256`: Integrity checksum.
-- `archives/project_YYYYMMDD_HHMMSS.zip`: Compressed archive.
+🗃️ Archiving Workflow
 
-## 🏗️ Architecture Overview
+1. Detect MD/SHA pairs
 
-Modular design follows hexagonal principles: Core (Config/DumpFile), Ports (Collector/Writer/Archiver), Adapters (CLI/TOML).
 
-```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│     CLI (Typer) │───▶│   Orchestrator   │───▶│   Single/Batch  │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-                                │
-                                ▼
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Config (TOML) │◀──▶│     Core (Pydantic)│◀──▶│   Utils (Logging)│
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-                                │
-                                ▼
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Collector     │───▶│     Writer (MD)  │───▶│   Archiver (ZIP)│
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-                                │
-                                ▼
-                          Prometheus Metrics
-```
+2. Group by prefix (src_, tests_)
 
-- **Entry**: `cli.py` → `orchestrator.py` / `single.py`.
-- **Flow**: Collect files → Concurrent write temps → Stream MD → Checksum/Archive.
-- **Safety**: Atomic replaces, finally cleanups, signal handlers.
 
-For deep dives: See [ADR-001: Unified Archiving](ADRs/001-unified-archiving.md).
+3. ZIP with verification
 
-## 🧪 Testing & Development
 
-### Running Tests
-```bash
-pytest --cov=src/create_dump --cov-report=html  # 93%+ threshold
-hypothesis pytest tests/  # Property-based fuzzing
-```
+4. Prune old dumps
 
-### Linting & Formatting
-```bash
-ruff check src/ tests/  # Linting
-black src/ tests/       # Formatting
-mypy src/               # Type checking
-```
 
-### Doctests
-Integrated via pytest; run standalone with `PYTHONPATH=src python -m doctest -v src/create_dump/*.py`.
+5. Cleanup + SHA generation
 
-## 🔒 Security & Reliability
 
-- **Path Safety**: `safe_is_within` prevents traversal; zip-slip mitigation in `_safe_arcname`.
-- **Integrity**: ZIP `testzip()` + SHA256; rollback on corruption.
-- **Resilience**: Tenacity retries, concurrent timeouts, CleanupHandler for SIGINT/TERM.
-- **Metrics**: Exposed on `:8000/metrics` (Prometheus); track `FILES_PROCESSED`, `ERRORS_TOTAL`.
-- **SLOs**: Target <5s dump latency; error budget via Grafana alerts.
 
-**Known Limitations**: Sync-only (async I/O in v7); no remote FS support.
+Artifacts produced:
 
-## 🤝 Contributing
+project_all_create_dump_YYYYMMDD_HHMMSS.md
 
-1. Fork & PR to `main` with Conventional Commits.
-2. Run full CI: `make test lint docs`.
-3. Add ADRs for architectural changes (see `/ADRs`).
-4. Sign CLA; follow [CODE_OF_CONDUCT.md].
+.sha256 checksum
 
-**Guidelines**:
-- 100% test coverage for new features.
-- No breaking changes without deprecation.
-- Security issues: Report to `security@dhruv.io`.
+archives/project_YYYYMMDD_HHMMSS.zip
 
-## 📄 License
 
-MIT License. See [LICENSE](LICENSE) for details.
 
-## 🙏 Acknowledgments
+---
 
-- Built on [Typer](https://typer.tiangolo.com/), [Rich](https://rich.readthedocs.io/), [Pydantic](https://pydantic.dev/).
-- Inspired by monorepo tools at scale (e.g., Bazel, Nx).
+🏗️ Architecture Overview
 
-**Questions?** Open an issue or reach dhruv@dhruv.io.
+┌───────────────┐    ┌─────────────────┐    ┌───────────────────┐
+│   CLI (Typer) │──▶ │  Orchestrator   │──▶ │   Single/Batch     │
+└───────────────┘    └─────────────────┘    └───────────────────┘
+                           │
+                           ▼
+┌───────────────┐    ┌─────────────────┐    ┌───────────────────┐
+│ Config (TOML) │◀──▶ │  Core (Models) │◀──▶ │ Logging/Utils     │
+└───────────────┘    └─────────────────┘    └───────────────────┘
+                           │
+                           ▼
+┌───────────────┐    ┌─────────────────┐    ┌───────────────────┐
+│   Collector   │──▶ │ Writer (MD/Zip) │──▶ │  Archiver (Zip)    │
+└───────────────┘    └─────────────────┘    └───────────────────┘
+
+
+---
+
+🧪 Testing & Development
+
+pytest --cov=src/create_dump --cov-report=html
+ruff check src/ tests/
+black src/ tests/
+mypy src/
+
+Doctests:
+
+PYTHONPATH=src python -m doctest -v src/create_dump/*.py
+
+
+---
+
+🔒 Security & Reliability
+
+Safe path guards (safe_is_within)
+
+ZIP integrity + SHA256 validation
+
+Tenacity retries
+
+Prometheus metrics on :8000/metrics
+
+Graceful SIGINT/SIGTERM cleanup handlers
+
+
+Limitations
+
+Sync-only I/O (async pipeline coming in v7)
+
+No remote filesystem support
+
+
+
+---
+
+🤝 Contributing
+
+1. Fork repo → create branch
+
+
+2. Follow Conventional Commits
+
+
+3. Run full CI suite
+
+
+4. Add/Update any ADRs under /ADRs
+
+
+5. Follow the Code of Conduct
+
+
+
+Security issues → security@dhruv.io
+
+
+---
+
+📄 License
+
+MIT License.
+See LICENSE.
+
+
+---
+
+🙏 Acknowledgments
+
+Powered by Typer, Rich, Pydantic, Prometheus
+
+Inspired by tooling from Nx, Bazel, and internal SRE practices
+
+
+Questions or ideas?
+Open an issue or email dhruv@dhruv.io.
+
+---
