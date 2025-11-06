@@ -2,9 +2,9 @@
 
 [![PyPI Version](https://badge.fury.io/py/create-dump.svg)](https://badge.fury.io/py/create-dump)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://github.com/dhruv/create-dump/actions/workflows/ci.yml/badge.svg)](https://github.com/dhruv/create-dump/actions)
-[![Coverage](https://img.shields.io/badge/coverage-93%25-brightgreen.svg)](https://codecov.io/gh/dhruv/create-dump)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
+[![Tests](https://github.com/dhruv13x/create-dump/actions/workflows/ci.yml/badge.svg)](https://github.com/dhruv13x/create-dump/actions)
+[![Coverage](https://codecov.io/gh/dhruv13x/create-dump/branch/main/graph/badge.svg)](https://codecov.io/gh/dhruv13x/create-dump)
 
 **Enterprise-Grade Code Dump Utility for Monorepos**
 
