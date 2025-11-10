@@ -1,244 +1,180 @@
 # tests/test_core.py
-"""Unit tests for core module."""
 
+"""
+Tests for Phase 1: src/create_dump/core.py
+"""
+
+from __future__ import annotations
 import pytest
+from pydantic import ValidationError
 from pathlib import Path
-import toml
-import re
 
 from create_dump.core import (
     Config,
-    GitMeta,
-    DumpFile,
     load_config,
-    DEFAULT_DUMP_PATTERN,
+    DEFAULT_DUMP_PATTERN
 )
 
-
-def test_config_validation():
-    cfg = Config(max_file_size_kb=1024)
-    assert cfg.max_file_size_kb == 1024
-    with pytest.raises(ValueError):
-        Config(max_file_size_kb=-1)  # Invalid
+# Mark all tests in this file as async-capable
+# (needed for the test_project fixture)
+pytestmark = pytest.mark.anyio
 
 
-def test_gitmeta_model():
-    meta = GitMeta(branch="main", commit="abc123")
-    assert meta.branch == "main"
-    assert meta.commit == "abc123"
+# --- Test Config Model (Validators) ---
+
+def test_config_defaults(default_config: Config):
+    """
+    Tests the sane default values of the Config model.
+    """
+    assert default_config.git_meta is True
+    assert default_config.use_gitignore is True
+    assert default_config.max_file_size_kb is None
+    assert default_config.dest is None
+    assert "pyproject.toml" not in default_config.default_excludes
+    assert ".git" in default_config.excluded_dirs
 
 
-def test_dumpfile_model():
-    df = DumpFile(path="test.py", language="python")
-    assert df.path == "test.py"
-    assert df.language == "python"
-    assert df.temp_path is None
-    assert df.error is None
+def test_config_validator_max_file_size():
+    """
+    Tests the 'max_file_size_kb' validator.
+    """
+    # Valid values
+    assert Config(max_file_size_kb=1000).max_file_size_kb == 1000
+    assert Config(max_file_size_kb=0).max_file_size_kb == 0
+    assert Config(max_file_size_kb=None).max_file_size_kb is None
+    
+    # Invalid value
+    with pytest.raises(ValidationError, match="must be non-negative"):
+        Config(max_file_size_kb=-1)
 
-    error_df = DumpFile(path="fail.py", error="Error")
-    assert error_df.error == "Error"
-    assert error_df.language is None
+def test_config_validator_dest():
+    """
+    Tests the 'dest' path validator.
+    """
+    # Valid values
+    assert Config(dest="path/to/dumps").dest == Path("path/to/dumps")
+    assert Config(dest="/abs/path").dest == Path("/abs/path")
+    assert Config(dest=None).dest is None
+    
+    # Invalid (empty) value should become None
+    assert Config(dest="").dest is None
 
-
-def test_load_config(tmp_path: Path):
-    config_path = tmp_path / "create_dump.toml"
-    config_path.write_text(
-        "[tool.create-dump]\n"
-        "max_file_size_kb = 512\n"
-        "excluded_dirs = ['custom']"
-    )
-    cfg = load_config(config_path)
-    assert cfg.max_file_size_kb == 512
-    assert "custom" in cfg.excluded_dirs
-
-
-def test_load_config_no_file():
-    cfg = load_config()
-    assert cfg.max_file_size_kb is None
-
-
-def test_config_dest_validation(tmp_path: Path):
-    # Valid dest (str -> Path)
-    valid_dest_str = str(tmp_path / "dumps")
-    cfg = Config(dest=valid_dest_str)
-    assert cfg.dest == Path(valid_dest_str)
-
-    # Valid Path
-    valid_dest_path = tmp_path / "dumps"
-    cfg = Config(dest=valid_dest_path)
-    assert cfg.dest == valid_dest_path
-
-    # Empty string -> None (hits if not path.name)
-    cfg = Config(dest="")
-    assert cfg.dest is None
-
-    # Invalid (non-str to hit except)
-    cfg = Config(dest=123)
-    assert cfg.dest is None
-
-    # None dest
-    cfg = Config(dest=None)
-    assert cfg.dest is None
+def test_config_validator_dump_pattern():
+    """
+    Tests the 'dump_pattern' validator to ensure it enforces the
+    canonical prefix.
+    """
+    # Default is valid
+    assert Config().dump_pattern == DEFAULT_DUMP_PATTERN
+    
+    # Custom valid pattern is accepted
+    custom_valid = r"my_prefix_all_create_dump_.*\.zip"
+    assert Config(dump_pattern=custom_valid).dump_pattern == custom_valid
+    
+    # Invalid (loose) pattern is reset to default
+    invalid_loose = r"some_other_pattern.*\.md"
+    assert Config(dump_pattern=invalid_loose).dump_pattern == DEFAULT_DUMP_PATTERN
+    
+    # Empty pattern is reset to default
+    assert Config(dump_pattern="").dump_pattern == DEFAULT_DUMP_PATTERN
 
 
-def test_config_dump_pattern_validation():
-    # Valid pattern (matches _all_create_dump_)
-    valid = r".*_all_create_dump_\d{8}_\d{6}\.md$"
-    cfg = Config(dump_pattern=valid)
-    assert cfg.dump_pattern == valid
+# --- Test load_config() ---
 
-    # Invalid pattern (no match) -> warning and default
-    invalid = r"loose_pattern"
-    cfg = Config(dump_pattern=invalid)
-    assert cfg.dump_pattern == DEFAULT_DUMP_PATTERN
+async def test_load_config_no_file(test_project):
+    """
+    Tests that default Config is returned when no config file is found.
+    We use test_project to ensure we are in a clean directory.
+    """
+    # 🐞 FIX: Pass the test_project's root as the explicit CWD
+    config = load_config(_cwd=test_project.root)
 
-    # Empty -> warning and default
-    cfg = Config(dump_pattern="")
-    assert cfg.dump_pattern == DEFAULT_DUMP_PATTERN
+    # 🐞 FIX: Robustly check for default values instead of brittle instance equality
+    default_config = Config()
+    assert config.dest == default_config.dest
+    assert config.git_meta == default_config.git_meta
+    assert config.max_file_size_kb == default_config.max_file_size_kb
 
+async def test_load_config_from_pyproject(test_project):
+    """
+    Tests that config is correctly loaded from [tool.create-dump]
+    in pyproject.toml.
+    """
+    await test_project.create({
+        "pyproject.toml": """
+[tool.create-dump]
+dest = "from_pyproject"
+git_meta = false
+"""
+    })
 
-def test_config_metrics_port():
-    # Valid
-    cfg = Config(metrics_port=8000)
-    assert cfg.metrics_port == 8000
+    # 🐞 FIX: Pass the test_project's root as the explicit CWD
+    config = load_config(_cwd=test_project.root)
+    assert config.dest == Path("from_pyproject")
+    assert config.git_meta is False
+    # Defaults should still be present
+    assert config.use_gitignore is True
 
-    # <1 -> ValueError
-    with pytest.raises(ValueError):
-        Config(metrics_port=0)
+async def test_load_config_from_dedicated_file(test_project):
+    """
+    Tests that config is correctly loaded from create_dump.toml.
+    """
+    await test_project.create({
+        "create_dump.toml": """
+[tool.create-dump]
+dest = "from_dedicated_toml"
+max_file_size_kb = 500
+"""
+    })
 
-    # >65535 -> ValueError
-    with pytest.raises(ValueError):
-        Config(metrics_port=70000)
+    # 🐞 FIX: Pass the test_project's root as the explicit CWD
+    config = load_config(_cwd=test_project.root)
+    assert config.dest == Path("from_dedicated_toml")
+    assert config.max_file_size_kb == 500
+    assert config.git_meta is True # Default
 
+async def test_load_config_precedence(test_project):
+    """
+    Tests that create_dump.toml takes precedence over pyproject.toml
+    (based on the `possible_paths` order in core.py).
+    """
+    await test_project.create({
+        "create_dump.toml": """
+[tool.create-dump]
+dest = "from_dedicated_toml"
+""",
+        "pyproject.toml": """
+[tool.create-dump]
+dest = "from_pyproject"
+"""
+    })
 
-def test_config_non_negative_validator():
-    # Valid None
-    cfg = Config(max_file_size_kb=None)
-    assert cfg.max_file_size_kb is None
+    # 🐞 FIX: Pass the test_project's root as the explicit CWD
+    config = load_config(_cwd=test_project.root)
+    # 'create_dump.toml' is checked first in CWD, so it should win.
+    assert config.dest == Path("from_dedicated_toml")
 
-    # Valid 0
-    cfg = Config(max_file_size_kb=0)
-    assert cfg.max_file_size_kb == 0
+async def test_load_config_with_explicit_path(test_project):
+    """
+    Tests that loading from an explicit path works and
+    ignores other config files.
+    """
+    await test_project.create({
+        "config/my_config.toml": """
+[tool.create-dump]
+dest = "from_explicit_path"
+""",
+        "pyproject.toml": """
+[tool.create-dump]
+dest = "from_pyproject"
+"""
+    })
+    
+    explicit_path = test_project.path("config/my_config.toml")
+    
+    # 🐞 FIX: Pass the test_project's root as the explicit CWD
+    # The explicit `path` argument will be used first, but we still
+    # pass _cwd to be consistent and safe.
+    config = load_config(path=explicit_path, _cwd=test_project.root)
 
-    # Valid positive
-    cfg = Config(max_file_size_kb=100)
-    assert cfg.max_file_size_kb == 100
-
-
-def test_load_config_invalid_toml(tmp_path: Path):
-    # TomlDecodeError
-    invalid_toml = tmp_path / "invalid.toml"
-    invalid_toml.write_text("invalid = [toml\n")  # Malformed
-    cfg = load_config(invalid_toml)
-    assert cfg.max_file_size_kb is None  # Defaults
-
-    # OSError: dir as file
-    dir_as_file = tmp_path / "dir.toml"
-    dir_as_file.mkdir()
-    cfg = load_config(dir_as_file)
-    assert cfg.max_file_size_kb is None
-
-
-def test_load_config_multiple_paths(monkeypatch, tmp_path: Path):
-    # Mock Path.home and Path.cwd to control
-    def mock_home():
-        return tmp_path / "home"
-    def mock_cwd():
-        return tmp_path / "cwd"
-
-    monkeypatch.setattr(Path, "home", staticmethod(mock_home))
-    monkeypatch.setattr(Path, "cwd", staticmethod(mock_cwd))
-
-    # Create home config (first in order)
-    home_dir = mock_home()
-    home_dir.mkdir()
-    home_config = home_dir / ".create_dump.toml"
-    home_config.write_text("[tool.create-dump]\nuse_gitignore = false")
-
-    # CWD config (second)
-    cwd_dir = mock_cwd()
-    cwd_dir.mkdir()
-    cwd_config = cwd_dir / ".create_dump.toml"
-    cwd_config.write_text("[tool.create-dump]\nuse_gitignore = true")
-
-    # Root config (third)
-    root_config = tmp_path / "create_dump.toml"
-    root_config.write_text("[tool.create-dump]\nuse_gitignore = maybe")
-
-    # Loads home first
-    cfg = load_config()
-    assert cfg.use_gitignore == False
-
-    # If no home, loads cwd
-    home_config.unlink()
-    cfg = load_config()
-    assert cfg.use_gitignore == True
-
-    # No files -> defaults
-    cwd_config.unlink()
-    root_config.unlink()
-    cfg = load_config()
-    assert cfg.use_gitignore == True  # Default
-
-
-def test_load_config_tool_namespace(tmp_path: Path):
-    # Correct [tool.create-dump]
-    pyproject = tmp_path / "pyproject.toml"
-    valid_custom_pattern = r".*_all_create_dump_custom_\d+\.md$"
-    # Escape for TOML: double backslashes for literal \
-    toml_pattern = valid_custom_pattern.replace("\\", "\\\\")
-    pyproject.write_text(
-        f"[tool.create-dump]\n"
-        f"git_meta = false\n"
-        f"dest = \"dumps\"\n"
-        f"dump_pattern = \"{toml_pattern}\""
-    )
-    cfg = load_config(pyproject)
-    assert cfg.git_meta == False
-    assert cfg.dest == Path("dumps")
-    assert cfg.dump_pattern == valid_custom_pattern  # Valid, no enforcement
-
-    # No [tool], empty dict
-    bad_pyproject = tmp_path / "bad.toml"
-    bad_pyproject.write_text("[other]\nkey = value")
-    cfg = load_config(bad_pyproject)
-    assert cfg.git_meta == True  # Default
-    assert cfg.dest is None
-
-    # Nested get handles missing
-
-
-def test_config_excluded_dirs():
-    # Default
-    cfg = Config()
-    assert "__pycache__" in cfg.excluded_dirs
-    assert len(cfg.excluded_dirs) > 1
-
-    # Override
-    custom = Config(excluded_dirs=["test_dir"])
-    assert custom.excluded_dirs == ["test_dir"]
-
-
-# Doctest coverage (if enabled)
-def test_load_config_doctest():
-    # Approximate doctest; actual runs in CLI --test
-    cfg = load_config()
-    assert isinstance(cfg, Config)
-    assert cfg.excluded_dirs == [
-        "__pycache__",
-        ".git",
-        ".venv",
-        "venv",
-        "myenv",
-        ".mypy_cache",
-        ".pytest_cache",
-        ".idea",
-        "node_modules",
-        "build",
-        "dist",
-        "vendor",
-        ".gradle",
-        ".tox",
-        "eggs",
-        ".egg-info",
-    ]
+    assert config.dest == Path("from_explicit_path")

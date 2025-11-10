@@ -1,38 +1,35 @@
 # src/create_dump/single.py
-"""Single dump runner."""
+
+"""
+Single dump runner.
+
+This file is the "glue" layer that connects the CLI flags
+from `cli/single.py` to the core orchestration logic.
+"""
 
 from __future__ import annotations
 
-import gzip
 import os
-import shutil
-from datetime import datetime, timezone
 from pathlib import Path
-from tempfile import TemporaryDirectory
 from typing import Optional
+
+import anyio
 from typer import Exit
 
-from .archiver import ArchiveManager
-from .collector import FileCollector
-from .core import Config, GitMeta, load_config
-from .path_utils import safe_is_within  # NEW: For dest validation
-from .utils import (
-    DUMP_DURATION,
-    _unique_path,
-    get_git_meta,
-    logger,
-    metrics_server,
-    styled_print,
-)
-from .writer import ChecksumWriter, MarkdownWriter
+# ⚡ REFACTOR: Import new orchestration and watch modules
+from .workflow.single import SingleRunOrchestrator
+from .watch import FileWatcher
+from .logging import styled_print
 
 
-def run_single(
+async def run_single(
     root: Path,
     dry_run: bool,
     yes: bool,
     no_toc: bool,
+    tree_toc: bool,
     compress: bool,
+    format: str,
     exclude: str,
     include: str,
     max_file_size: Optional[int],
@@ -48,154 +45,90 @@ def run_single(
     archive_keep_latest: bool,
     archive_keep_last: Optional[int],
     archive_clean_root: bool,
+    archive_format: str,
     allow_empty: bool,
     metrics_port: int,
     verbose: bool,
     quiet: bool,
-    dest: Optional[Path] = None,  # NEW: Destination dir for output
+    dest: Optional[Path] = None,
+    # ⚡ NEW: v8 feature flags
+    watch: bool = False,
+    git_ls_files: bool = False,
+    diff_since: Optional[str] = None,
+    scan_secrets: bool = False,
+    hide_secrets: bool = False,
 ) -> None:
+    
     root = root.resolve()
     if not root.is_dir():
         raise ValueError(f"Invalid root: {root}")
 
-    os.chdir(root)  # Normalize cwd
+    # Normalize cwd once at the start
+    await anyio.to_thread.run_sync(os.chdir, root)
+    
+    # ⚡ REFACTOR: Handle `yes` logic for watch mode
+    # If --watch is on, we don't want prompts on subsequent runs.
+    effective_yes = yes or watch
 
-    # Load & override config
-    cfg = load_config()
-    if max_file_size is not None:
-        cfg.max_file_size_kb = max_file_size
-
-    # Parse patterns
-    includes = [p.strip() for p in include.split(",") if p.strip()]
-    excludes = [p.strip() for p in exclude.split(",") if p.strip()]
-
-    # Collect files
-    collector = FileCollector(cfg, includes, excludes, use_gitignore, root)
-    files_list = collector.collect()
-
-    if not files_list:
-        msg = "⚠️ No matching files found; skipping dump."
-        logger.warning(msg)
-        if verbose:
-            logger.debug("Excludes: %s, Includes: %s", excludes, includes)
-        if not quiet:
-            styled_print(f"[yellow]{msg}[/yellow]")
-        if not allow_empty:
-            raise Exit(code=1)
-        return
-
-    total_size = sum((root / f).stat().st_size for f in files_list)
-    logger.info(
-        "Collection complete",
-        count=len(files_list),
-        total_size_kb=total_size / 1024,
-        root=str(root),
+    # ⚡ REFACTOR: Instantiate the orchestrator
+    orchestrator = SingleRunOrchestrator(
+        root=root,
+        dry_run=dry_run,
+        yes=effective_yes, # Pass the combined value
+        no_toc=no_toc,
+        tree_toc=tree_toc,
+        compress=compress,
+        format=format,
+        exclude=exclude,
+        include=include,
+        max_file_size=max_file_size,
+        use_gitignore=use_gitignore,
+        git_meta=git_meta,
+        progress=progress,
+        max_workers=max_workers,
+        archive=archive,
+        archive_all=archive_all,
+        archive_search=archive_search,
+        archive_include_current=archive_include_current,
+        archive_no_remove=archive_no_remove,
+        archive_keep_latest=archive_keep_latest,
+        archive_keep_last=archive_keep_last,
+        archive_clean_root=archive_clean_root,
+        archive_format=archive_format,
+        allow_empty=allow_empty,
+        metrics_port=metrics_port,
+        verbose=verbose,
+        quiet=quiet,
+        dest=dest,
+        git_ls_files=git_ls_files,
+        diff_since=diff_since,
+        scan_secrets=scan_secrets,
+        hide_secrets=hide_secrets,
     )
-    if not quiet:
-        styled_print(
-            f"[green]📄 Found {len(files_list)} files ({total_size / 1024:.1f} KB total).[/green]"
-        )
 
-    # Resolve outfile early for prompt (NEW: Uses dest/output logic)
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-    foldername = root.name or "project"
-    branded_name = Path(f"{foldername}_all_create_dump_{timestamp}.md")
-    output_dest = root  # Default
-    if dest:
-        output_dest = dest.resolve()
-        if not output_dest.is_absolute():
-            output_dest = root / output_dest
-        if not safe_is_within(output_dest, root):
-            logger.warning("Absolute dest outside root; proceeding with caution.")
-        output_dest.mkdir(parents=True, exist_ok=True)
-    base_outfile = output_dest / branded_name  # 🐞 FIX: Always append branded to dest (dir)
-    prompt_outfile = _unique_path(base_outfile)  # Simulate unique for prompt
-
-    if not yes and not dry_run and not quiet:
-        styled_print(
-            f"Proceed with dump to [blue]{prompt_outfile}[/blue]? [yellow](y/n)[/yellow]",
-            nl=False,
-        )
-        if not input("").lower().startswith("y"):
-            styled_print("[red]Cancelled.[/red]")
-            raise Exit(code=1)
-
-    try:
-        if dry_run:
-            styled_print("[green]✅ Dry run: Would process listed files.[/green]")
-            if not quiet:
-                for p in files_list:
-                    styled_print(f" - {p}")
-            raise Exit(code=0)
-
-        # Secure output path (NEW: Full dest/output integration)
-        outfile = _unique_path(base_outfile)  # Use resolved branded path
-
-        gmeta = get_git_meta(root) if git_meta else None
-
-        temp_dir = TemporaryDirectory()
+    # ⚡ REFACTOR: Top-level control flow
+    if watch:
+        if not quiet:
+            styled_print("[green]Running initial dump...[/green]")
+        
         try:
-            with metrics_server(port=metrics_port):
-                with DUMP_DURATION.time():
-                    writer = MarkdownWriter(outfile, no_toc, gmeta, temp_dir.name)
-                    writer.dump_concurrent(files_list, progress, max_workers)
-
-            # Compress if requested
-            if compress:
-                gz_outfile = outfile.with_suffix(".md.gz")
-                with open(outfile, "rb") as f_in, gzip.open(gz_outfile, "wb") as f_out:
-                    shutil.copyfileobj(f_in, f_out)
-                outfile.unlink()
-                outfile = gz_outfile
-                logger.info("Output compressed", path=str(outfile))
-
-            # Checksum
-            checksum_writer = ChecksumWriter()
-            checksum = checksum_writer.write(outfile)
-            if not quiet:
-                styled_print(f"[blue]{checksum}[/blue]")
-
-            # Archive if enabled (unified)
-            if archive or archive_all:
-                manager = ArchiveManager(
-                    root=root,
-                    timestamp=timestamp,
-                    keep_latest=archive_keep_latest,
-                    keep_last=archive_keep_last,
-                    clean_root=archive_clean_root,
-                    search=archive_search,
-                    include_current=archive_include_current,
-                    no_remove=archive_no_remove,
-                    dry_run=dry_run,
-                    yes=yes,
-                    verbose=verbose,
-                    md_pattern=cfg.dump_pattern,
-                    archive_all=archive_all,
-                )
-                archive_results = manager.run(current_outfile=outfile)
-                if archive_results:
-                    groups = ', '.join(k for k, v in archive_results.items() if v)
-                    if not quiet:
-                        styled_print(f"[green]Archived groups: {groups}[/green]")
-                    logger.info("Archiving complete", groups=groups)
-                else:
-                    msg = "ℹ️ No prior dumps found for archiving."
-                    if not quiet:
-                        styled_print(f"[yellow]{msg}[/yellow]")
-                    logger.info(msg)
-
-            # Final metrics
-            success_count = sum(1 for f in writer.files if not f.error)
-            logger.info(
-                "Dump summary",
-                success=success_count,
-                errors=len(writer.files) - success_count,
-                output=str(outfile),
-            )
-        finally:
-            temp_dir.cleanup()
-
-    except Exit as e:
-        if getattr(e, "exit_code", None) == 0 and dry_run:
-            return
-        raise
+            await orchestrator.run()
+        except Exit as e:
+            if getattr(e, "exit_code", None) == 0 and dry_run:
+                 # Handle dry_run exit for the *initial* run
+                 return
+            raise # Re-raise other exits
+        
+        if not quiet:
+            styled_print(f"\n[cyan]Watching for file changes in {root}... (Press Ctrl+C to stop)[/cyan]")
+        
+        watcher = FileWatcher(root=root, dump_func=orchestrator.run, quiet=quiet)
+        await watcher.start()
+    else:
+        try:
+            await orchestrator.run()
+        except Exit as e:
+            if getattr(e, "exit_code", None) == 0 and dry_run:
+                # Handle dry_run exit
+                return
+            raise

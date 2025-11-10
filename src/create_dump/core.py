@@ -1,4 +1,5 @@
 # src/create_dump/core.py
+
 """Core models and configuration.
 
 Pydantic models for validation, config loading.
@@ -11,12 +12,11 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field, field_validator
 
-from .utils import logger
-
+from .logging import logger  # ⚡ REFACTOR: Corrected import from .utils
 import toml
 
 # Canonical pattern for dump artifacts (imported/used by modules)
-DEFAULT_DUMP_PATTERN = r".*_all_create_dump_\d{8}_\d{6}\.(md(\.gz)?|sha256)$"  # NEW: Strict brandmark regex
+DEFAULT_DUMP_PATTERN = r".*_all_create_dump_\d{8}_\d{6}\.(md(\.gz)?|sha256)$"
 
 
 class Config(BaseModel):
@@ -25,31 +25,24 @@ class Config(BaseModel):
     default_includes: List[str] = Field(default_factory=list)
     default_excludes: List[str] = Field(default_factory=list)
     use_gitignore: bool = True
-    git_meta: bool = True  # Added: Default enables Git metadata inclusion
+    git_meta: bool = True
     max_file_size_kb: Optional[int] = Field(None, ge=0)
     dest: Optional[Path] = Field(None, description="Default output destination (CLI --dest overrides)")
-    dump_pattern: str = Field(DEFAULT_DUMP_PATTERN, description="Canonical regex for dump artifacts (enforces isolation)")  # NEW
+    dump_pattern: str = Field(DEFAULT_DUMP_PATTERN, description="Canonical regex for dump artifacts")
     excluded_dirs: List[str] = Field(
         default_factory=lambda: [
-            "__pycache__",
-            ".git",
-            ".venv",
-            "venv",
-            "myenv",
-            ".mypy_cache",
-            ".pytest_cache",
-            ".idea",
-            "node_modules",
-            "build",
-            "dist",
-            "vendor",
-            ".gradle",
-            ".tox",
-            "eggs",
-            ".egg-info",
+            "__pycache__", ".git", ".venv", "venv", "myenv", ".mypy_cache",
+            ".pytest_cache", ".idea", "node_modules", "build", "dist",
+            "vendor", ".gradle", ".tox", "eggs", ".egg-info",
         ]
     )
     metrics_port: int = Field(8000, ge=1, le=65535)
+
+    # ⚡ NEW: v8 feature flags
+    git_ls_files: bool = Field(False, description="Use 'git ls-files' for file collection.")
+    scan_secrets: bool = Field(False, description="Enable secret scanning.")
+    hide_secrets: bool = Field(False, description="Redact found secrets (requires scan_secrets=True).")
+
 
     @field_validator("max_file_size_kb", mode="before")
     @classmethod
@@ -64,7 +57,7 @@ class Config(BaseModel):
         if v is not None:
             try:
                 path = Path(v)
-                if not path.name:  # Warn on empty
+                if not path.name:
                     logger.warning("Empty dest path; defaulting to None.")
                     return None
                 return path
@@ -76,8 +69,7 @@ class Config(BaseModel):
     @field_validator("dump_pattern", mode="after")
     @classmethod
     def validate_dump_pattern(cls, v):
-        """Ensure pattern is non-empty and warn on loose matches."""
-        if not v or not re.match(r'.*_all_create_dump_', v):  # Basic sanity
+        if not v or not re.match(r'.*_all_create_dump_', v):
             logger.warning("Loose or invalid dump_pattern '%s'; enforcing default: %s", v, DEFAULT_DUMP_PATTERN)
             return DEFAULT_DUMP_PATTERN
         return v
@@ -89,37 +81,43 @@ class GitMeta(BaseModel):
 
 
 class DumpFile(BaseModel):
-    """Processed file metadata (no content for memory safety)."""
-
     path: str
     language: Optional[str] = None
-    temp_path: Optional[Path] = None  # Temp content file
+    temp_path: Optional[Path] = None
     error: Optional[str] = None
 
 
-def load_config(path: Optional[Path] = None) -> Config:
-    """
-    >>> config = load_config()
-    """
+# 🐞 FIX: Add `_cwd` parameter for testability
+def load_config(path: Optional[Path] = None, _cwd: Optional[Path] = None) -> Config:
+    """Loads config from [tool.create-dump] in TOML files."""
     config_data: Dict[str, Any] = {}
+    
+    # 🐞 FIX: Use provided _cwd for testing, or default to Path.cwd()
+    cwd = _cwd or Path.cwd()
+
     possible_paths = (
         [path]
         if path
         else [
-            Path.home() / ".create_dump.toml",
-            Path.cwd() / ".create_dump.toml",
-            Path("create_dump.toml"),
+            Path.home() / ".create_dump.toml", # 1. Home dir
+            cwd / ".create_dump.toml",         # 2. CWD .create_dump.toml
+            cwd / "create_dump.toml",          # 3. CWD create_dump.toml
+            cwd / "pyproject.toml",          # 4. CWD pyproject.toml
         ]
     )
+    
     for conf_path in possible_paths:
         if conf_path.exists():
             try:
                 full_data = toml.load(conf_path)
-                # NEW: Load from [tool.create-dump] namespace
                 config_data = full_data.get("tool", {}).get("create-dump", {})
-                logger.debug("Config loaded", path=conf_path, keys=list(config_data.keys()))
-                break
+                if config_data:  # Stop if we find it
+                    logger.debug("Config loaded", path=conf_path, keys=list(config_data.keys()))
+                    break
             except (toml.TomlDecodeError, OSError) as e:
                 logger.warning("Config load failed", path=conf_path, error=str(e))
-    # Fallback: CLI args (e.g., dest) override post-load in run_single/run_batch
     return Config(**config_data)
+
+
+# ⚡ REFACTOR: Removed generate_default_config() function.
+# This logic is now handled by the interactive wizard in cli/main.py.

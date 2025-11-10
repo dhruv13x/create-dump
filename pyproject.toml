@@ -1,46 +1,71 @@
 # pyproject.toml
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
 name = "create-dump"
-version = "6.1.0"
+dynamic = ["version"]
 description = "Enterprise-grade code dump utility for monorepos"
-authors = [{name = "dhruv", email = "dhruv13x@gmail.com"}]
-dependencies = [
-    "typer>=0.12.0",
-    "rich>=13.0.0",
-    "pathspec>=0.12.0",
-    "structlog>=24.0.0",
-    "tenacity>=8.2.0",
-    "pydantic>=2.0.0",
-    "toml>=0.10.0",
-    "prometheus-client>=0.20.0",
-]
-requires-python = ">=3.11"
-classifiers = [
-    "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3",
-    "Topic :: Software Development :: Documentation",
-]
 readme = "README.md"
+requires-python = ">=3.11"
+
+author = "dhruv"
+author_email = "dhruv13x@gmail.com"
+
+authors = [
+  { name = "dhruv", email = "dhruv13x@gmail.com" }
+]
+
+license = { text = "MIT © dhruv" }
+
+classifiers = [
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Topic :: Software Development :: Documentation",
+]
+
+dependencies = [
+  "typer>=0.12.0",
+  "rich>=13.0.0",
+  "pathspec>=0.12.0",
+  "structlog>=24.0.0",
+  "tenacity>=8.2.0",
+  "pydantic>=2.0.0",
+  "toml>=0.10.0",
+  "prometheus-client>=0.20.0",
+  "anyio>=4.0.0",
+  "aiofiles>=23.0.0",
+  "watchdog>=4.0.0",
+  "detect-secrets>=1.5.0",
+]
+
+[project.urls]
+Homepage = "https://pypi.org/project/create-dump/"
+Source   = "https://github.com/dhruv13x/create-dump"
+Issues   = "https://github.com/dhruv13x/create-dump/issues"
 
 [project.scripts]
 create-dump = "create_dump.cli:app"
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=8.0.0",
-    "ruff>=0.6.0",
-    "black>=24.3.0",
-    "mypy>=1.11.0",
-    "coverage>=7.5.0",
-    "hypothesis>=6.100.0",
+  "pytest>=8.0.0",
+  "ruff>=0.6.0",
+  "black>=24.3.0",
+  "mypy>=1.11.0",
+  "coverage>=7.5.0",
+  "hypothesis>=6.100.0",
+  "pytest-anyio>=4.0.0",
+  "pytest-mock>=3.10.0"
 ]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/create_dump"]
+
+[tool.hatch.version]
+path = "src/create_dump/version.py"
 
 [tool.ruff]
 line-length = 100
@@ -48,7 +73,7 @@ target-version = "py311"
 
 [tool.black]
 line-length = 100
-target-version = ['py311']
+target-version = ["py311"]
 
 [tool.mypy]
 python_version = "3.11"
@@ -61,24 +86,27 @@ branch = true
 omit = ["*/tests/*"]
 
 [tool.coverage.report]
-fail_under = 85
+fail_under = 90
 show_missing = true
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
+pythonpath = "src"
 timeout = 10
 testpaths = ["tests"]
-addopts = "--cov=src/create_dump --cov-report=html --cov-fail-under=85"
-
-filterwarnings = [
-    "ignore::DeprecationWarning:create_dump.batch",
+addopts = [
+  "-ra",
+  "--strict-config",
+  "--strict-markers",
+  "--cov",
+  "--cov-report=term-missing",
+  "--cov-report=html",
+  "--cov-report=term-missing:skip-covered"
 ]
 
-# NEW: Config section for runtime defaults (loaded via load_config)
 [tool.create-dump]
-# dest = "/path/to/dumps"  # Uncomment and customize: Default output destination (CLI --dest overrides)
 use_gitignore = true
 git_meta = true
-max_file_size_kb = 5000  # Example: Limit file sizes in KB
-
-#addopts = "--doctest-modules --doctest-ellipsis"
+max_file_size_kb = 5000
+# git_ls_files = false
+# scan_secrets = false
+# hide_secrets = false

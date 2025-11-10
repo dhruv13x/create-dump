@@ -1,4 +1,5 @@
 # src/create_dump/path_utils.py
+
 """Shared utilities for path safety, discovery, and user confirmation."""
 
 from __future__ import annotations
@@ -6,25 +7,51 @@ from __future__ import annotations
 import logging
 import re
 from pathlib import Path
-from typing import List
+# ⚡ REFACTOR: Import AsyncGenerator
+from typing import List, AsyncGenerator
 
-from .utils import logger  # For warnings
+import anyio  # ⚡ REFACTOR: Import anyio
+from .logging import logger  # ⚡ REFACTOR: Import from logging
 
-__all__ = ["safe_is_within", "find_matching_files", "confirm"]
+# ⚡ REFACTOR: Removed safe_is_within and find_matching_files
+__all__ = ["safe_is_within", "confirm", "find_matching_files"]
 
 
-def safe_is_within(path: Path, root: Path) -> bool:
-    """Check if path is safely within root (relative/escape-proof)."""
+# ⚡ REFACTOR: Removed synchronous safe_is_within function
+
+
+# ⚡ NEW: Async version of safe_is_within for anyio.Path
+async def safe_is_within(path: anyio.Path, root: anyio.Path) -> bool:
+    """
+    Async check if path is safely within root (relative/escape-proof).
+    Handles anyio.Path objects by awaiting .resolve().
+    """
     try:
-        return path.resolve().is_relative_to(root.resolve())
+        # 1. Await resolution for both paths
+        resolved_path = await path.resolve()
+        resolved_root = await root.resolve()
+        
+        # 2. Perform the check on the resulting sync pathlib.Path objects
+        return resolved_path.is_relative_to(resolved_root)
     except AttributeError:
-        return str(path.resolve()).startswith(str(root.resolve()) + "/")
+        # Fallback for Python < 3.9
+        resolved_path = await path.resolve()
+        resolved_root = await root.resolve()
+        return str(resolved_path).startswith(str(resolved_root) + "/")
 
 
-def find_matching_files(root: Path, regex: str) -> List[Path]:
-    """Glob files matching regex within root."""
+# ⚡ REFACTOR: Removed synchronous find_matching_files function
+
+
+# ⚡ REFACTOR: New async version of find_matching_files
+async def find_matching_files(root: Path, regex: str) -> AsyncGenerator[Path, None]:
+    """Async glob files matching regex within root."""
     pattern = re.compile(regex)
-    return [p for p in root.rglob("*") if pattern.search(p.name)]
+    anyio_root = anyio.Path(root)
+    # ⚡ REFACTOR: Yield paths directly instead of building a list
+    async for p in anyio_root.rglob("*"):
+        if pattern.search(p.name):
+            yield Path(p)  # Yield as pathlib.Path
 
 
 def confirm(prompt: str) -> bool:

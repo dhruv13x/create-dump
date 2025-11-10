@@ -1,75 +1,131 @@
 # src/create_dump/cleanup.py
+
 """Safe, auditable cleanup of files/directories with dry-run and prompts."""
 
 from __future__ import annotations
 
 import shutil
 from pathlib import Path
-from typing import List, Tuple
+# ⚡ REFACTOR: Import AsyncGenerator, Union, and collections.abc
+from typing import List, Tuple, AsyncGenerator, Union
+import collections.abc
 
-from .path_utils import confirm, safe_is_within
-from .utils import logger  # ← Use named logger
+import anyio
+# ⚡ REFACTOR: Import async finder and new async safe_is_within
+from .path_utils import (
+    confirm,
+    find_matching_files, safe_is_within
+)
+from .logging import logger
 
-
+# ⚡ REFACTOR: Removed safe_delete_paths and safe_cleanup
 __all__ = ["safe_delete_paths", "safe_cleanup"]
 
 
-def safe_delete_paths(
-    paths: List[Path], root: Path, dry_run: bool, assume_yes: bool
-) -> Tuple[int, int]:
-    """Delete files or directories in a safe manner.
+# ⚡ REFACTOR: Removed synchronous safe_delete_paths function
 
-    Returns (deleted_files, deleted_dirs).
-    """
+
+async def safe_delete_paths(
+    # ⚡ REFACTOR: Accept either a List (for existing callers) or an AsyncGenerator
+    paths: Union[List[Path], AsyncGenerator[Path, None]], 
+    root: Path, 
+    dry_run: bool, 
+    assume_yes: bool
+) -> Tuple[int, int]:
+    """Delete files or directories in a safe, async manner."""
     deleted_files = deleted_dirs = 0
-    for p in paths:
-        p_resolved = p.resolve()
-        if not safe_is_within(p_resolved, root):
-            logger.warning("Skipping path outside root: %s", p_resolved)
+    
+    # ⚡ REFACTOR: Convert root to anyio.Path once
+    anyio_root = anyio.Path(root)
+    
+    # ⚡ REFACTOR: Create a unified async iterator to handle both types
+    async def async_iter(paths_iterable):
+        if isinstance(paths_iterable, collections.abc.AsyncGenerator):
+            async for p_gen in paths_iterable:
+                yield p_gen
+        else: # It's a List
+            for p_list in paths_iterable:
+                yield p_list
+
+    # ⚡ REFACTOR: Use the unified iterator
+    async for p in async_iter(paths):
+        # 1. 🐞 FIX: Use the original anyio.Path object for all async I/O
+        anyio_p = anyio.Path(p)
+
+        # 2. 🐞 FIX: Use the new async safety check
+        if not await safe_is_within(anyio_p, anyio_root):
+            # Log using the original path for clarity
+            logger.warning(f"Skipping path outside root: {p}")
             continue
 
-        if p_resolved.is_file():
+        # 3. Use the original, async-capable anyio_p for I/O
+        if await anyio_p.is_file():
             if dry_run:
-                logger.info("[dry-run] would delete file: %s", p_resolved)
+                logger.info(f"[dry-run] would delete file: {p}")
             else:
                 try:
-                    p_resolved.unlink()
-                    logger.info("Deleted file: %s", p_resolved)
+                    await anyio_p.unlink()
+                    logger.info(f"Deleted file: {p}")
                     deleted_files += 1
-                except Exception as e:
-                    logger.error("Failed to delete file %s: %s", p_resolved, e)
-        elif p_resolved.is_dir():
+                # ⚡ REFACTOR: Narrow exception scope
+                except OSError as e:
+                    logger.error(f"Failed to delete file {p}: {e}")
+                    
+        elif await anyio_p.is_dir():
             if not assume_yes and not dry_run:
-                ok = confirm(f"Remove directory tree: {p_resolved}?")
+                ok = await anyio.to_thread.run_sync(
+                    confirm, f"Remove directory tree: {p}?"
+                )
                 if not ok:
                     continue
             if dry_run:
-                logger.info("[dry-run] would remove directory: %s", p_resolved)
+                logger.info(f"[dry-run] would remove directory: {p}")
             else:
                 try:
-                    shutil.rmtree(p_resolved)
-                    logger.info("Removed directory: %s", p_resolved)
+                    # 🐞 FIX: Wrap sync shutil.rmtree in thread pool (anyio.Path lacks rmtree)
+                    await anyio.to_thread.run_sync(shutil.rmtree, anyio_p)
+                    logger.info(f"Removed directory: {p}")
                     deleted_dirs += 1
-                except Exception as e:
-                    logger.error("Failed to remove directory %s: %s", p_resolved, e)
+                # ⚡ REFACTOR: Narrow exception scope
+                except OSError as e:
+                    logger.error(f"Failed to remove directory {p}: {e}")
     return deleted_files, deleted_dirs
 
 
-def safe_cleanup(root: Path, pattern: str, dry_run: bool, assume_yes: bool, verbose: bool) -> None:
-    """Standalone cleanup of matching paths."""
-    from .path_utils import find_matching_files
+# ⚡ REFACTOR: Removed synchronous safe_cleanup function
 
-    matches = find_matching_files(root, pattern)
-    if not matches:
+
+# ⚡ REFACTOR: New async version of safe_cleanup
+async def safe_cleanup(root: Path, pattern: str, dry_run: bool, assume_yes: bool, verbose: bool) -> None:
+    """Standalone async cleanup of matching paths."""
+    # ⚡ REFACTOR: find_matching_files is now a generator
+    matches_gen = find_matching_files(root, pattern)
+    
+    # ⚡ REFACTOR: We must 'peek' at the generator to see if it's empty
+    try:
+        first_match = await anext(matches_gen)
+    except StopAsyncIteration:
         logger.info("No matching files found for cleanup.")
         return
 
     if verbose:
-        logger.info("Found %d paths to clean", len(matches))
+        # ⚡ REFACTOR: We can no longer give an exact count without memory cost.
+        logger.info(f"Found paths to clean (starting with: {first_match.name}).")
     if dry_run:
         logger.info("Dry-run: Skipping deletions.")
         return
 
-    if assume_yes or confirm("Delete all matching files?"):
-        deleted_files, deleted_dirs = safe_delete_paths(matches, root, dry_run=False, assume_yes=assume_yes)
-        logger.info("Cleanup complete: %d files, %d dirs deleted", deleted_files, deleted_dirs)
+    user_confirmed = assume_yes or await anyio.to_thread.run_sync(
+        confirm, "Delete all matching files?"
+    )
+    if user_confirmed:
+        # ⚡ REFACTOR: Chain the peeked item back onto the generator
+        async def final_gen() -> AsyncGenerator[Path, None]:
+            yield first_match
+            async for p in matches_gen:
+                yield p
+
+        deleted_files, deleted_dirs = await safe_delete_paths(
+            final_gen(), root, dry_run=False, assume_yes=assume_yes
+        )
+        logger.info(f"Cleanup complete: {deleted_files} files, {deleted_dirs} dirs deleted")
