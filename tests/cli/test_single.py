@@ -71,8 +71,8 @@ class TestSingleCli:
             result = cli_runner.invoke(app, ["single", str(file_path)])
 
             assert result.exit_code != 0
-            # 🐞 FIX: Typer errors print to stderr
-            assert "is not a directory" in result.stderr
+            # ⚡ REFACTOR: Typer BadParameter errors print to result.output
+            assert "is not a directory" in result.output
 
     def test_flag_conflict_git_ls_and_diff(self, cli_runner: CliRunner):
         """
@@ -83,8 +83,8 @@ class TestSingleCli:
             "single", ".", "--git-ls-files", "--diff-since", "main"
         ])
         assert result.exit_code != 0
-        # 🐞 FIX: Typer errors print to stderr
-        assert "mutually exclusive" in result.stderr
+        # ⚡ REFACTOR: Typer BadParameter errors print to result.output
+        assert "mutually exclusive" in result.output
 
     def test_flag_conflict_hide_secrets(self, cli_runner: CliRunner):
         """
@@ -93,8 +93,8 @@ class TestSingleCli:
         """
         result = cli_runner.invoke(app, ["single", ".", "--hide-secrets"])
         assert result.exit_code != 0
-        # 🐞 FIX: Typer errors print to stderr
-        assert "requires --scan-secrets" in result.stderr
+        # ⚡ REFACTOR: Typer BadParameter errors print to result.output
+        assert "requires --scan-secrets" in result.output
 
     @pytest.mark.parametrize(
         "cli_flags, expected_dry_run_val",
