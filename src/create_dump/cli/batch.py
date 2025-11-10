@@ -26,7 +26,6 @@ batch_app = typer.Typer(no_args_is_help=True, context_settings={"help_option_nam
 
 @batch_app.callback()
 def batch_callback(
-    # 🐞 FIX: Remove verbose and quiet. They are inherited from main.
     # Controls (Standardized; dry-run default ON for safety)
     dry_run: bool = typer.Option(True, "-d", "--dry-run", help="Perform a dry-run (default: ON for batch)."),
     dest: Optional[Path] = typer.Option(None, "--dest", help="Global destination dir for outputs (default: root)."),
@@ -37,8 +36,7 @@ def batch_callback(
         $ create-dump batch run --dirs src,tests --archive-all -y  # Batch dumps + grouped archive, skip prompts
         $ create-dump batch clean --pattern '.*dump.*' -y -nd  # Real cleanup of olds
     """
-    # 🐞 FIX: Logging is now set by the main_callback or the subcommand.
-    # setup_logging(verbose=verbose, quiet=quiet)
+    # Logging is now set by the main_callback or the subcommand.
     pass
 
 
@@ -80,44 +78,62 @@ def run(
 
     # Controls (Standardized)
     yes: bool = typer.Option(False, "-y", "--yes", help="Assume yes for deletions and prompts [default: false]."),
+    dry_run: Optional[bool] = typer.Option(None, "-d", "--dry-run", help="Simulate without writing files (overrides batch default)."),
     no_dry_run: bool = typer.Option(False, "-nd", "--no-dry-run", help="Run for real (disables inherited dry-run) [default: false]."),
+    verbose: Optional[bool] = typer.Option(None, "-v", "--verbose", help="Enable debug logging."),
+    quiet: Optional[bool] = typer.Option(None, "-q", "--quiet", help="Suppress output (CI mode)."),
 ):
     """Run dumps in multiple subdirectories, cleanup olds, and centralize files.
 
     Examples:
         $ create-dump batch run src/ --dest central/ --dirs api,web -c -y -nd  # Real batch to central dir
     """
-    # 🐞 FIX: Get all inherited params from parent context
+    # 1. Get flags from all 3 levels
     parent_params = ctx.parent.params
-    # 🐞 FIX: Get verbose/quiet from the *root* context
     main_params = ctx.find_root().params
     
-    inherited_dry_run = parent_params.get('dry_run', True)
-    inherited_verbose = main_params.get('verbose', False) # Default to main's default
-    inherited_quiet = main_params.get('quiet', False)
+    # 2. Resolve dry_run (safe by default)
+    # Start with the batch-level default
+    effective_dry_run = parent_params.get('dry_run', True)
+    # If the *command* flag is set, it wins
+    if dry_run is True:
+        effective_dry_run = True
+    # --no-dry-run always wins
+    if no_dry_run is True:
+        effective_dry_run = False
 
-    effective_dry_run = inherited_dry_run and not no_dry_run
+    # 3. Resolve verbose/quiet (inheriting from root)
+    if quiet is True:
+        verbose_val = False
+        quiet_val = True
+    elif verbose is True:
+        verbose_val = True
+        quiet_val = False
+    else: # Neither was set at the command level, so inherit from main
+        verbose_val = main_params.get('verbose', False)
+        quiet_val = main_params.get('quiet', False)
+        if quiet_val:
+            verbose_val = False
+
+    # 4. Re-run logging setup
+    setup_logging(verbose=verbose_val, quiet=quiet_val)
+    
     subdirs = split_dirs(dirs)
     
-    # 🐞 FIX: Re-run logging setup in case this command was called directly
-    if inherited_quiet:
-        inherited_verbose = False
-    setup_logging(verbose=inherited_verbose, quiet=inherited_quiet)
-    
-    # ⚡ REFACTOR: Call the async function using anyio.run
+    # 5. Call async function
     anyio.run(
         run_batch,
         root,
         subdirs,
         pattern,
         effective_dry_run,
-        yes,
+        yes, # 'yes' is simple, just pass it
         accept_prompts,
         compress,
         format,
         max_workers,
-        inherited_verbose, # Pass inherited value
-        inherited_quiet,   # Pass inherited value
+        verbose_val, # Pass resolved value
+        quiet_val,   # Pass resolved value
         dest or parent_params.get('dest'), # Pass inherited value
         archive,
         archive_all,
@@ -133,50 +149,64 @@ def run(
 
 @batch_app.command()
 def clean(
-    ctx: typer.Context, # 🐞 FIX: Add context
+    ctx: typer.Context,
     # Core Arguments
     root: Path = typer.Argument(Path("."), help="Root project path."),
     pattern: str = typer.Argument(DEFAULT_DUMP_PATTERN, help="Regex for old dumps to delete [default: canonical pattern]."),
 
     # Controls (Standardized)
     yes: bool = typer.Option(False, "-y", "--yes", help="Skip confirmations for deletions [default: false]."),
-    no_dry_run: bool = typer.Option(False, "-nd", "--no-dry-run", help="Run for real (disables dry-run) [default: false]."),
+    dry_run: Optional[bool] = typer.Option(None, "-d", "--dry-run", help="Simulate without writing files (overrides batch default)."),
+    no_dry_run: bool = typer.Option(False, "-nd", "--no-dry-run", help="Run for real (disables inherited dry-run) [default: false]."),
+    verbose: Optional[bool] = typer.Option(None, "-v", "--verbose", help="Enable debug logging."),
+    quiet: Optional[bool] = typer.Option(None, "-q", "--quiet", help="Suppress output (CI mode)."),
 ) -> None:
     """Cleanup old dump files/directories without running new dumps.
 
     Examples:
         $ create-dump batch clean . '.*old_dump.*' -y -nd -v  # Real verbose cleanup
     """
-    # 🐞 FIX: Get all inherited params from parent context
+    # 1. Get flags from all 3 levels
     parent_params = ctx.parent.params
-    # 🐞 FIX: Get verbose/quiet from the *root* context
     main_params = ctx.find_root().params
 
-    inherited_dry_run = parent_params.get('dry_run', True)
-    inherited_verbose = main_params.get('verbose', False)
-    inherited_quiet = main_params.get('quiet', False)
+    # 2. Resolve dry_run
+    effective_dry_run = parent_params.get('dry_run', True)
+    if dry_run is True:
+        effective_dry_run = True
+    if no_dry_run is True:
+        effective_dry_run = False
 
-    effective_dry_run = inherited_dry_run and not no_dry_run
+    # 3. Resolve verbose/quiet
+    if quiet is True:
+        verbose_val = False
+        quiet_val = True
+    elif verbose is True:
+        verbose_val = True
+        quiet_val = False
+    else:
+        verbose_val = main_params.get('verbose', False)
+        quiet_val = main_params.get('quiet', False)
+        if quiet_val:
+            verbose_val = False
 
-    # 🐞 FIX: Re-run logging setup
-    if inherited_quiet:
-        inherited_verbose = False
-    setup_logging(verbose=inherited_verbose, quiet=inherited_quiet)
+    # 4. Re-run logging setup
+    setup_logging(verbose=verbose_val, quiet=quiet_val)
     
-    # ⚡ REFACTOR: Call the async function using anyio.run
+    # 5. Call async function
     anyio.run(
         safe_cleanup,
         root,
         pattern,
         effective_dry_run,
         yes,
-        inherited_verbose # Pass inherited value
+        verbose_val # Pass resolved value
     )
 
 
 @batch_app.command()
 def archive(
-    ctx: typer.Context, # 🐞 FIX: Add context
+    ctx: typer.Context,
     # Core Arguments
     root: Path = typer.Argument(Path("."), help="Root project path."),
     pattern: str = typer.Argument(r".*_all_create_dump_\d{8}_\d{6}\.(md(\.gz)?)$", help="Regex for MD dumps [default: canonical MD subset]."),
@@ -190,42 +220,58 @@ def archive(
 
     # Controls (Standardized)
     yes: bool = typer.Option(False, "-y", "--yes", help="Skip confirmations [default: false]."),
+    dry_run: Optional[bool] = typer.Option(None, "-d", "--dry-run", help="Simulate without writing files (overrides batch default)."),
     no_dry_run: bool = typer.Option(False, "-nd", "--no-dry-run", help="Run for real (disables simulation) [default: false]."),
+    verbose: Optional[bool] = typer.Option(None, "-v", "--verbose", help="Enable debug logging."),
+    quiet: Optional[bool] = typer.Option(None, "-q", "--quiet", help="Suppress output (CI mode)."),
 ) -> None:
     """Archive existing dump pairs into ZIP; optional clean/prune (unified with single mode).
 
     Examples:
         $ create-dump batch archive monorepo/ '.*custom' --archive-all -y -v  # Grouped archive, verbose, skip prompts
     """
-    # ⚡ FIX: Removed redundant local import. The module-level import will be used.
-    # from ..archiver import ArchiveManager
-    
-    # 🐞 FIX: Get all inherited params from parent context
+    # 1. Get flags from all 3 levels
     parent_params = ctx.parent.params
-    # 🐞 FIX: Get verbose/quiet and archive_format from the *root* context
     main_params = ctx.find_root().params
-
-    inherited_dry_run = parent_params.get('dry_run', True)
-    inherited_verbose = main_params.get('verbose', False) # archive defaults to NOT verbose
-    inherited_quiet = main_params.get('quiet', False)
-    inherited_archive_format = main_params.get('archive_format', 'zip') # Get from root
-
-    effective_dry_run = inherited_dry_run and not no_dry_run
     
-    # 🐞 FIX: Re-run logging setup
-    if inherited_quiet:
-        inherited_verbose = False
-    setup_logging(verbose=inherited_verbose, quiet=inherited_quiet)
+    # Get archive_format from root
+    inherited_archive_format = main_params.get('archive_format', 'zip')
+
+    # 2. Resolve dry_run
+    effective_dry_run = parent_params.get('dry_run', True)
+    if dry_run is True:
+        effective_dry_run = True
+    if no_dry_run is True:
+        effective_dry_run = False
+    
+    # 3. Resolve verbose/quiet
+    if quiet is True:
+        verbose_val = False
+        quiet_val = True
+    elif verbose is True:
+        verbose_val = True
+        quiet_val = False
+    else:
+        verbose_val = main_params.get('verbose', False)
+        quiet_val = main_params.get('quiet', False)
+        if quiet_val:
+            verbose_val = False
+    
+    # 4. Re-run logging setup
+    setup_logging(verbose=verbose_val, quiet=quiet_val)
     
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     
     manager = ArchiveManager(
         root, timestamp, archive_keep_latest, archive_keep_last, archive_clean_root,
         search=archive_search,
-        dry_run=effective_dry_run, yes=yes, verbose=inherited_verbose, md_pattern=pattern, # Pass inherited
+        dry_run=effective_dry_run, 
+        yes=yes, 
+        verbose=verbose_val, # Pass resolved value
+        md_pattern=pattern,
         archive_all=archive_all,
-        archive_format=inherited_archive_format # 🐞 FIX: Pass inherited format
+        archive_format=inherited_archive_format # Pass inherited format
     )
     
-    # ⚡ REFACTOR: Call the async run method using anyio.run
+    # 5. Call async function
     anyio.run(manager.run)  # No current_outfile for batch

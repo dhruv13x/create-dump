@@ -505,9 +505,11 @@ class TestArchivePackager:
         assert archive_path is None
         assert archived_files == []
 
+    @pytest.mark.anyio(backend='asyncio')
     async def test_create_archive_sync_stores_compressed_files(
         self, base_packager_args, test_project, mocker
     ):
+
         """
         Test Coverage for line 89: _create_archive_sync uses ZIP_STORED for .gz files.
         """

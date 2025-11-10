@@ -15,7 +15,8 @@ from typing import Optional
 import anyio
 import typer
 
-from ..logging import logger, styled_print
+# ⚡ REFACTOR: Import setup_logging
+from ..logging import logger, styled_print, setup_logging
 from ..path_utils import confirm
 from ..rollback.engine import RollbackEngine
 from ..rollback.parser import MarkdownParser
@@ -173,25 +174,62 @@ def rollback(
         help="Specify a dump file to use (e.g., my_dump.md). Default: find latest.",
         show_default=False
     ),
+    # ⚡ REFACTOR: Add all 6 consistent flags in order
     yes: bool = typer.Option(
         False,
         "--yes",
         "-y",
-        help="Assume yes to all prompts."
+        help="Assume yes for prompts and deletions [default: false]."
     ),
     dry_run: bool = typer.Option(
         False,
         "-d",
         "--dry-run",
-        help="Simulate without writing any files."
-    )
+        help="Simulate without writing files (default: off)."
+    ),
+    no_dry_run: bool = typer.Option(
+        False, 
+        "-nd", 
+        "--no-dry-run", 
+        help="Run for real (disables simulation) [default: false]."
+    ),
+    verbose: Optional[bool] = typer.Option(
+        None, 
+        "-v", 
+        "--verbose", 
+        help="Enable debug logging."
+    ),
+    quiet: Optional[bool] = typer.Option(
+        None, 
+        "-q", 
+        "--quiet", 
+        help="Suppress output (CI mode)."
+    ),
 ):
     """
     Rolls back a create-dump .md file to a full project structure.
     """
-    # Inherit quiet setting from main
+    # ⚡ REFACTOR: Add logic block from cli/single.py
     main_params = ctx.find_root().params
-    quiet = main_params.get('quiet', False)
+    
+    effective_dry_run = dry_run and not no_dry_run
+
+    if quiet is True:
+        verbose_val = False
+        quiet_val = True
+    elif verbose is True:
+        verbose_val = True
+        quiet_val = False
+    else: # Neither was set at the command level, so inherit from main
+        verbose_val = main_params.get('verbose', False)
+        quiet_val = main_params.get('quiet', False)
+        
+        # Final sanity check if inheriting: quiet wins
+        if quiet_val:
+            verbose_val = False
+
+    # Re-run setup_logging in case 'rollback' was called directly
+    setup_logging(verbose=verbose_val, quiet=quiet_val)
     
     try:
         anyio.run(
@@ -199,8 +237,8 @@ def rollback(
             root,
             file,
             yes,
-            dry_run,
-            quiet
+            effective_dry_run, # Pass resolved value
+            quiet_val          # Pass resolved value
         )
     except (FileNotFoundError, ValueError) as e:
         # These are caught by the parser/engine and logged

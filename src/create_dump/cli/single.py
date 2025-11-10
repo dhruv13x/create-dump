@@ -64,7 +64,6 @@ def single(
     yes: bool = typer.Option(False, "-y", "--yes", help="Assume yes for prompts and deletions [default: false]."),
     dry_run: bool = typer.Option(False, "-d", "--dry-run", help="Simulate without writing files (default: off)."),
     no_dry_run: bool = typer.Option(False, "-nd", "--no-dry-run", help="Run for real (disables simulation) [default: false]."),
-    # 🐞 FIX: Add verbose and quiet flags back, defaulting to None
     verbose: Optional[bool] = typer.Option(None, "-v", "--verbose", help="Enable debug logging."),
     quiet: Optional[bool] = typer.Option(None, "-q", "--quiet", help="Suppress output (CI mode)."),
 ):

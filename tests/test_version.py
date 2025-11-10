@@ -10,7 +10,7 @@ from create_dump.version import __version__, VERSION
 def test_version_consistency():
     """Test Case 1: __version__ and VERSION are identical."""
     assert __version__ == VERSION
-    assert __version__ == "9.0.0"  # Pin to current; update on release
+    assert __version__ == "10.0.0"  # Pin to current; update on release
 
 
 def test_version_format_semver():

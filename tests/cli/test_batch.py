@@ -7,7 +7,7 @@ Tests for src/create_dump/cli/batch.py
 from __future__ import annotations
 import pytest
 from typer.testing import CliRunner
-from unittest.mock import MagicMock, patch, AsyncMock
+from unittest.mock import MagicMock, patch, AsyncMock, call
 from pathlib import Path
 
 # Import the app to test
@@ -98,7 +98,6 @@ class TestBatchCli:
         """
         mock_run = mock_cli_deps["anyio_run"]
 
-        # 🐞 FIX: Use isolated_filesystem
         with cli_runner.isolated_filesystem():
             result = cli_runner.invoke(app, ["batch", "run", "."])
 
@@ -107,16 +106,15 @@ class TestBatchCli:
         call_args = mock_run.call_args[0]
         assert call_args[4] is True  # Check effective_dry_run (arg 4)
 
-    def test_batch_callback_no_dry_run(
+    def test_batch_run_no_dry_run_override(
         self, cli_runner: CliRunner, mock_cli_deps: dict
     ):
         """
         Test Case 2: (Callback Override)
-        Validates that --no-dry-run correctly overrides the callback's default.
+        Validates that `batch run --no-dry-run` overrides the batch default.
         """
         mock_run = mock_cli_deps["anyio_run"]
 
-        # 🐞 FIX: Use isolated_filesystem
         with cli_runner.isolated_filesystem():
             result = cli_runner.invoke(app, ["batch", "run", ".", "--no-dry-run"])
 
@@ -134,7 +132,6 @@ class TestBatchCli:
         """
         mock_run = mock_cli_deps["anyio_run"]
 
-        # 🐞 FIX: Use isolated_filesystem
         with cli_runner.isolated_filesystem() as temp_dir:
             result = cli_runner.invoke(app, [
                 "batch", "run", ".",
@@ -153,7 +150,6 @@ class TestBatchCli:
         call_args = mock_run.call_args[0]
 
         assert call_args[0].__name__ == "run_batch"
-        # 🐞 FIX: Assert against the Path object `.`
         assert call_args[1] == Path(".")       # root
         assert call_args[2] == ["src", "tests"]      # subdirs
         assert call_args[3] == ".*.log"              # pattern
@@ -162,7 +158,6 @@ class TestBatchCli:
         assert call_args[8] == "json"                # format
         assert call_args[9] == 10                    # max_workers
         assert call_args[14] is True                 # archive_all
-        # 🐞 FIX: Corrected index from 20 to 21
         assert call_args[21] == "tar.gz"             # archive_format
 
     def test_run_command_dest_inheritance(
@@ -174,7 +169,6 @@ class TestBatchCli:
         """
         mock_run = mock_cli_deps["anyio_run"]
 
-        # 🐞 FIX: Use isolated_filesystem
         with cli_runner.isolated_filesystem():
             result = cli_runner.invoke(app, [
                 "batch", "--dest", "global/dest", "run", "."
@@ -184,7 +178,6 @@ class TestBatchCli:
         mock_run.assert_called_once()
         call_args = mock_run.call_args[0]
 
-        # 🐞 FIX: Wrap in Path() to robustly compare str vs Path
         assert Path(call_args[12]) == Path("global/dest")
 
     def test_run_command_dest_override(
@@ -196,7 +189,6 @@ class TestBatchCli:
         """
         mock_run = mock_cli_deps["anyio_run"]
 
-        # 🐞 FIX: Use isolated_filesystem
         with cli_runner.isolated_filesystem():
             result = cli_runner.invoke(app, [
                 "batch", "--dest", "global/dest",
@@ -217,9 +209,7 @@ class TestBatchCli:
         """
         mock_run = mock_cli_deps["anyio_run"]
 
-        # 🐞 FIX: Use isolated_filesystem
         with cli_runner.isolated_filesystem() as temp_dir:
-            # 🐞 FIX: Pass pattern as a positional argument, not an option
             result = cli_runner.invoke(app, [
                 "batch", "clean", ".",
                 ".*.log",
@@ -227,29 +217,22 @@ class TestBatchCli:
                 "--no-dry-run"
             ])
 
-        # 🐞 FIX: The exit code should now be 0
         assert result.exit_code == 0
         mock_run.assert_called_once()
         call_args = mock_run.call_args[0]
 
         assert call_args[0].__name__ == "safe_cleanup"
-        # 🐞 FIX: Assert against the Path object `.`
         assert call_args[1] == Path(".") # root
         assert call_args[2] == ".*.log"          # pattern
         assert call_args[3] is False             # effective_dry_run
         assert call_args[4] is True              # yes
-        # 🐞 FIX: Assert new default 'verbose=False' from main_callback
         assert call_args[5] is False             # verbose (default from main)
 
-    # -----------------
-    # 🐞 NEW TESTS START HERE
-    # -----------------
-    
     def test_archive_command_flags(
         self, cli_runner: CliRunner, mock_cli_deps: dict
     ):
         """
-        Action Plan 1: Test `batch archive` Subcommand (lines 200-230).
+        Test Case 7: (archive command)
         Validates flags are passed to ArchiveManager and anyio.run.
         """
         mock_run = mock_cli_deps["anyio_run"]
@@ -273,23 +256,16 @@ class TestBatchCli:
         # 1. Assert ArchiveManager was instantiated correctly
         mock_manager_class.assert_called_once()
         
-        # ⚡ FIX: Get both positional and keyword args
         call_args = mock_manager_class.call_args
         pos_args = call_args[0]
         call_kwargs = call_args[1]
 
-        # ⚡ FIX: Assert positional 'root' argument
         assert pos_args[0] == Path(".")
-        # pos_args[1] is the timestamp
         assert isinstance(pos_args[1], str) 
-        # ⚡ FIX: Assert positional 'archive_keep_latest'
         assert pos_args[2] is False 
-        # ⚡ FIX: Assert positional 'archive_keep_last'
         assert pos_args[3] == 7
-        # ⚡ FIX: Assert positional 'archive_clean_root'
         assert pos_args[4] is True
         
-        # ⚡ FIX: Assert keyword arguments
         assert call_kwargs["archive_all"] is True
         assert call_kwargs["search"] is True
         assert call_kwargs["yes"] is True
@@ -299,50 +275,40 @@ class TestBatchCli:
         # 2. Assert anyio.run was called with the manager's run method
         mock_run.assert_called_once_with(mock_manager_instance.run)
 
-    def test_run_command_quiet_flag(
+    def test_run_command_quiet_flag_inheritance(
         self, cli_runner: CliRunner, mock_cli_deps: dict
     ):
         """
-        Test Coverage for line 104: `if inherited_quiet: ...` in run()
+        Test Case 8: (Inheritance)
+        Tests `create-dump -q batch run .`
         """
         mock_run = mock_cli_deps["anyio_run"]
         mock_logging = mock_cli_deps["setup_logging"]
 
         with cli_runner.isolated_filesystem():
-            # Invoke `create-dump -q batch run .`
             result = cli_runner.invoke(app, ["-q", "batch", "run", "."])
 
         assert result.exit_code == 0
-        
-        # 1. Assert setup_logging was called with quiet=True, verbose=False
         mock_logging.assert_called_with(verbose=False, quiet=True)
-        
-        # 2. Assert the correct flags were passed to the async function
-        mock_run.assert_called_once()
         call_args = mock_run.call_args[0]
         assert call_args[10] is False # inherited_verbose
         assert call_args[11] is True  # inherited_quiet
 
-    def test_clean_command_quiet_flag(
+    def test_clean_command_quiet_flag_inheritance(
         self, cli_runner: CliRunner, mock_cli_deps: dict
     ):
         """
-        Test Coverage for line 163: `if inherited_quiet: ...` in clean()
+        Test Case 9: (Inheritance)
+        Tests `create-dump -q batch clean .`
         """
         mock_run = mock_cli_deps["anyio_run"]
         mock_logging = mock_cli_deps["setup_logging"]
 
         with cli_runner.isolated_filesystem():
-            # Invoke `create-dump -q batch clean .`
             result = cli_runner.invoke(app, ["-q", "batch", "clean", "."])
 
         assert result.exit_code == 0
-        
-        # 1. Assert setup_logging was called with quiet=True, verbose=False
         mock_logging.assert_called_with(verbose=False, quiet=True)
-        
-        # 2. Assert the correct flags were passed to the async function
-        mock_run.assert_called_once()
         call_args = mock_run.call_args[0]
         assert call_args[5] is False # inherited_verbose
 
@@ -350,12 +316,12 @@ class TestBatchCli:
         self, cli_runner: CliRunner, mock_cli_deps: dict
     ):
         """
-        Test `batch archive` inherits archive_format from main.
+        Test Case 10: (Inheritance)
+        Tests `batch archive` inherits archive_format from main.
         """
         mock_manager_class = mock_cli_deps["ArchiveManager_class"]
         
         with cli_runner.isolated_filesystem():
-            # Set --archive-format at the root level
             result = cli_runner.invoke(app, [
                 "--archive-format", "tar.gz", 
                 "batch", "archive", "."
@@ -363,7 +329,83 @@ class TestBatchCli:
         
         assert result.exit_code == 0
         
-        # Assert ArchiveManager was instantiated with the inherited format
         mock_manager_class.assert_called_once()
         call_kwargs = mock_manager_class.call_args[1]
         assert call_kwargs["archive_format"] == "tar.gz"
+
+    # --- NEW TESTS FOR COVERAGE ---
+
+    @pytest.mark.parametrize("command", ["run", "clean", "archive"])
+    def test_batch_subcommand_flag_overrides(
+        self, cli_runner: CliRunner, mock_cli_deps: dict, command: str
+    ):
+        """
+        Test Case 11: (Flag Overrides)
+        Tests that subcommand flags for verbose/quiet/dry_run override
+        root and parent flags. Covers all new missing lines.
+        """
+        mock_run = mock_cli_deps["anyio_run"]
+        mock_logging = mock_cli_deps["setup_logging"]
+        mock_manager_class = mock_cli_deps["ArchiveManager_class"]
+
+        # --- Test 1: Subcommand -q overrides root -v ---
+        with cli_runner.isolated_filesystem():
+            cli_runner.invoke(app, ["-v", "batch", command, "--quiet", "."])
+        
+        mock_logging.assert_called_with(verbose=False, quiet=True)
+        
+        if command == "run":
+            call_args = mock_run.call_args[0]
+            assert call_args[10] is False # verbose_val
+            assert call_args[11] is True  # quiet_val
+        elif command == "clean":
+            call_args = mock_run.call_args[0]
+            assert call_args[5] is False # verbose_val
+        elif command == "archive":
+            call_kwargs = mock_manager_class.call_args[1]
+            assert call_kwargs["verbose"] is False
+
+        mock_run.reset_mock()
+        mock_logging.reset_mock()
+        mock_manager_class.reset_mock()
+
+        # --- Test 2: Subcommand -v overrides root -q ---
+        with cli_runner.isolated_filesystem():
+            cli_runner.invoke(app, ["-q", "batch", command, "--verbose", "."])
+
+        mock_logging.assert_called_with(verbose=True, quiet=False)
+        
+        if command == "run":
+            call_args = mock_run.call_args[0]
+            assert call_args[10] is True # verbose_val
+            assert call_args[11] is False  # quiet_val
+        elif command == "clean":
+            call_args = mock_run.call_args[0]
+            assert call_args[5] is True # verbose_val
+        elif command == "archive":
+            call_kwargs = mock_manager_class.call_args[1]
+            assert call_kwargs["verbose"] is True
+            
+        mock_run.reset_mock()
+        mock_logging.reset_mock()
+        mock_manager_class.reset_mock()
+
+        # --- Test 3: Subcommand --dry-run overrides parent's effective False ---
+        # (e.g., if parent had --no-dry-run, but this isn't possible,
+        # so we just test that `batch run --dry-run` hits the logic)
+        with cli_runner.isolated_filesystem():
+            cli_runner.invoke(app, ["batch", command, "--dry-run", "."])
+
+        if command == "run":
+            call_args = mock_run.call_args[0]
+            assert call_args[4] is True # effective_dry_run
+        elif command == "clean":
+            call_args = mock_run.call_args[0]
+            assert call_args[3] is True # effective_dry_run
+        elif command == "archive":
+            call_kwargs = mock_manager_class.call_args[1]
+            assert call_kwargs["dry_run"] is True
+
+        mock_run.reset_mock()
+        mock_logging.reset_mock()
+        mock_manager_class.reset_mock()

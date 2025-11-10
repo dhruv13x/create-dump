@@ -94,6 +94,7 @@ def _run_interactive_init() -> str:
 @app.callback(invoke_without_command=True)
 def main_callback(
     ctx: typer.Context,
+    # --- App Controls ---
     version: bool = typer.Option(False, "-V", "--version", help="Show version and exit."),
     init: bool = typer.Option(
         False, 
@@ -103,18 +104,21 @@ def main_callback(
     ),
     config: Optional[str] = typer.Option(None, "--config", help="Path to TOML config file."),
     
-    # ⚡ FIX: All flags from 'single' must be duplicated here
-    # so they can be parsed when 'single' is the default command.
+    # --- ⚡ REFACTOR: Grouped SRE/Control Flags ---
+    yes: bool = typer.Option(False, "-y", "--yes", help="Assume yes for prompts and deletions [default: false]."),
+    dry_run: bool = typer.Option(False, "-d", "--dry-run", help="Simulate without writing files (default: off)."),
+    no_dry_run: bool = typer.Option(False, "-nd", "--no-dry-run", help="Run for real (disables simulation) [default: false]."),
+    verbose: bool = typer.Option(False, "-v", "--verbose", help="Enable debug logging [default: false]."),
+    quiet: bool = typer.Option(False, "-q", "--quiet", help="Suppress output (CI mode) [default: false]."),
+    
+    # --- Default Command ('single') Flags ---
     dest: Optional[Path] = typer.Option(None, "--dest", help="Destination dir for output (default: root)."),
     no_toc: bool = typer.Option(False, "--no-toc", help="Omit table of contents."),
     tree_toc: bool = typer.Option(False, "--tree-toc", help="Render Table of Contents as a file tree."),
     format: str = typer.Option("md", "--format", help="Output format (md or json)."),
     compress: bool = typer.Option(False, "-c", "--compress", help="Gzip the output file."),
-    # 🐞 FIX: Add '/--no-progress' to the flag definition
     progress: bool = typer.Option(True, "-p", "--progress/--no-progress", help="Show processing progress."),
     allow_empty: bool = typer.Option(False, "--allow-empty", help="Succeed on 0 files (default: fail)."),
-    # 🐞 FIX: Remove 'test' flag
-    # test: bool = typer.Option(False, "-t", "--test", help="Run inline tests."),
     metrics_port: int = typer.Option(8000, "--metrics-port", help="Prometheus export port [default: 8000]."),
     exclude: str = typer.Option("", "--exclude", help="Comma-separated exclude patterns."),
     include: str = typer.Option("", "--include", help="Comma-separated include patterns."),
@@ -136,13 +140,6 @@ def main_callback(
     archive_keep_last: Optional[int] = typer.Option(None, "--archive-keep-last", help="Keep last N archives."),
     archive_clean_root: bool = typer.Option(False, "--archive-clean-root", help="Clean root post-archive."),
     archive_format: str = typer.Option("zip", "--archive-format", help="Archive format (zip, tar.gz, tar.bz2)."),
-    yes: bool = typer.Option(False, "-y", "--yes", help="Assume yes for prompts and deletions [default: false]."),
-    dry_run: bool = typer.Option(False, "-d", "--dry-run", help="Simulate without writing files (default: off)."),
-    no_dry_run: bool = typer.Option(False, "-nd", "--no-dry-run", help="Run for real (disables simulation) [default: false]."),
-    
-    # ⚡ REFACTOR: verbose/quiet flags live here for the main app
-    verbose: bool = typer.Option(False, "-v", "--verbose", help="Enable debug logging [default: false]."),
-    quiet: bool = typer.Option(False, "-q", "--quiet", help="Suppress output (CI mode) [default: false]."),
 ):
     """Create Markdown code dumps from source files.
 
@@ -189,8 +186,6 @@ def main_callback(
             compress=compress,
             progress=progress,
             allow_empty=allow_empty,
-            # 🐞 FIX: Remove 'test' argument
-            # test=test,
             metrics_port=metrics_port,
             exclude=exclude,
             include=include,
