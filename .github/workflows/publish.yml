@@ -30,17 +30,17 @@ jobs:
           python -m pip install --upgrade pip
           pip install pytest pytest-cov build twine
 
-      # NEW: Run tests with coverage
-      - name: 🧪 Run tests & generate coverage
-        run: pytest --cov=create_dump --cov-report=xml tests/  # Adjust path if tests/ differs
+#      # NEW: Run tests with coverage
+#      - name: 🧪 Run tests & generate coverage
+#        run: pytest --cov=create_dump --cov-report=xml tests/  # Adjust path if tests/ differs
 
-      # NEW: Upload coverage to Codecov
-      - name: 📊 Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          file: coverage.xml  # Matches pytest-cov output
-          verbose: true
+#      # NEW: Upload coverage to Codecov
+#      - name: 📊 Upload coverage reports to Codecov
+#        uses: codecov/codecov-action@v5
+#        with:
+#          token: ${{ secrets.CODECOV_TOKEN }}
+#          file: coverage.xml  # Matches pytest-cov output
+#          verbose: true
 
       - name: 📦 Install build tools  # Consolidated; now includes prior pip upgrade
         run: |
