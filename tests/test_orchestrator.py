@@ -8,7 +8,7 @@ from __future__ import annotations
 import pytest
 from datetime import datetime, timezone
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch, ANY
 # ⚡ FIX: Import AsyncGenerator
 from typing import List, AsyncGenerator
 
@@ -622,3 +622,141 @@ class TestRunBatch:
         # Assert that the atomic transaction block was exited early
         mock_centralize_spy.assert_not_called()
 # [TEST_SKELETON_END]
+
+
+    # --- NEW P1 TESTS ---
+
+    async def test_run_batch_non_atomic_archive(
+        self, test_project, multi_subdirs: List[str], mocker, mock_config, mock_find_files_gen
+    ):
+        """
+        Covers lines 285-317 (non-atomic path with archiving).
+        """
+        root = test_project.root
+        dest = root / "custom_dest"
+        
+        mocker.patch("create_dump.orchestrator.load_config", return_value=mock_config)
+        mocker.patch("create_dump.orchestrator.run_single", new_callable=AsyncMock)
+        mock_centralize = mocker.patch("create_dump.orchestrator._centralize_outputs", new_callable=AsyncMock)
+        mock_validate = mocker.patch("create_dump.orchestrator.validate_batch_staging", new_callable=AsyncMock, return_value=True)
+        
+        mock_archive_mgr_instance = AsyncMock()
+        mock_archive_mgr_instance.run = AsyncMock(return_value={"default": Path("archive.zip")})
+        mock_archive_mgr_class = mocker.patch(
+            "create_dump.orchestrator.ArchiveManager", 
+            return_value=mock_archive_mgr_instance
+        )
+
+        await run_batch(
+            root=root,
+            subdirs=multi_subdirs,
+            pattern=mock_config.dump_pattern,
+            dry_run=False,
+            yes=True,
+            accept_prompts=True,
+            compress=False,
+            max_workers=2,
+            verbose=False,
+            quiet=True,
+            dest=dest,
+            archive=True, # Enable archive
+            atomic=False, # Key flag
+        )
+
+        mock_centralize.assert_called_once_with(dest, root, ANY, False, True, mock_config.dump_pattern)
+        mock_validate.assert_called_once_with(anyio.Path(dest), mock_config.dump_pattern)
+        
+        # Assert ArchiveManager was called with the *root* path
+        mock_archive_mgr_class.assert_called_once()
+        assert mock_archive_mgr_class.call_args[1]["root"] == root
+        mock_archive_mgr_instance.run.assert_called_once()
+
+    async def test_run_batch_non_atomic_validation_fails(
+        self, test_project, multi_subdirs: List[str], mocker, mock_config, mock_logger, mock_find_files_gen
+    ):
+        """
+        Covers lines 306-308 (validation failure in non-atomic mode).
+        """
+        root = test_project.root
+        dest = root / "custom_dest"
+        
+        mocker.patch("create_dump.orchestrator.load_config", return_value=mock_config)
+        mocker.patch("create_dump.orchestrator.run_single", new_callable=AsyncMock)
+        mocker.patch("create_dump.orchestrator._centralize_outputs", new_callable=AsyncMock)
+        
+        # Mock validation to fail
+        mocker.patch("create_dump.orchestrator.validate_batch_staging", new_callable=AsyncMock, return_value=False)
+        
+        # 🐞 FIX: Correctly mock the ArchiveManager to be awaitable
+        mock_archive_mgr_instance = AsyncMock()
+        mock_archive_mgr_instance.run = AsyncMock(return_value={}) # Return empty
+        mock_archive_mgr_class = mocker.patch(
+            "create_dump.orchestrator.ArchiveManager", 
+            return_value=mock_archive_mgr_instance
+        )
+
+        await run_batch(
+            root=root,
+            subdirs=multi_subdirs,
+            pattern=mock_config.dump_pattern,
+            dry_run=False,
+            yes=True,
+            accept_prompts=True,
+            compress=False,
+            max_workers=2,
+            verbose=False,
+            quiet=True,
+            dest=dest,
+            archive=True,
+            atomic=False,
+        )
+
+        # Assert the warning was logged and no error was raised
+        mock_logger.warning.assert_called_with("Validation failed: Incomplete dumps in non-atomic destination.")
+        
+        # Assert ArchiveManager was *still* called (non-transactional)
+        mock_archive_mgr_class.assert_called_once()
+        mock_archive_mgr_instance.run.assert_called_once()
+
+    async def test_run_batch_pre_cleanup_declined(
+        self, test_project, multi_subdirs: List[str], mocker, mock_config, mock_find_files_gen
+    ):
+        """
+        Covers lines 212-216 (pre-cleanup prompt declined).
+        """
+        root = test_project.root
+        mocker.patch("create_dump.orchestrator.load_config", return_value=mock_config)
+        
+        # Mock find_matching_files to return a file
+        mock_find_files_gen([root / "old_dump.md"])
+        
+        # Mock confirm to return False
+        mock_confirm = mocker.patch("create_dump.orchestrator.confirm", return_value=False)
+        mock_safe_delete = mocker.patch("create_dump.orchestrator.safe_delete_paths", new_callable=AsyncMock)
+        mock_run_single = mocker.patch("create_dump.orchestrator.run_single", new_callable=AsyncMock)
+        
+        # 🐞 FIX: Mock validation to pass so the test doesn't fail early
+        mocker.patch("create_dump.orchestrator.validate_batch_staging", new_callable=AsyncMock, return_value=True)
+
+        await run_batch(
+            root=root,
+            subdirs=multi_subdirs,
+            pattern=mock_config.dump_pattern,
+            dry_run=False,
+            yes=False, # Key flag
+            accept_prompts=True,
+            compress=False,
+            max_workers=2,
+            verbose=False,
+            quiet=True,
+            dest=None,
+            archive=False,
+            atomic=True,
+        )
+
+        # Assert confirm was called and safe_delete was NOT
+        mock_confirm.assert_called_once_with("Delete old dumps?")
+        mock_safe_delete.assert_not_called()
+        
+        # Assert the rest of the run continued
+        assert mock_run_single.call_count == len(multi_subdirs)

@@ -21,6 +21,8 @@ from ..version import VERSION
 # ⚡ REFACTOR: Import commands and command groups from submodules
 from .single import single
 from .batch import batch_app
+# ✨ NEW: Import the rollback function directly
+from .rollback import rollback
 
 
 app = typer.Typer(
@@ -223,3 +225,6 @@ app.command()(single)
 
 # ⚡ REFACTOR: Register the imported 'batch' app
 app.add_typer(batch_app, name="batch")
+
+# ✨ NEW: Register the rollback function as a standard command
+app.command(name="rollback", help="Rehydrate a project structure from a create-dump file.")(rollback)

@@ -1,10 +1,10 @@
 # create-dump
 
-[![PyPI Version](https://badge.fury.io/py/create-dump.svg)](https://badge.fury.io/py/create-dump)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://github.com/dhruv13x/create-dump/actions/workflows/ci.yml/badge.svg)](https://github.com/dhruv13x/create-dump/actions)
-[![Coverage](https://codecov.io/gh/dhruv13x/create-dump/branch/main/graph/badge.svg)](https://codecov.io/gh/dhruv13x/create-dump)
+![PyPI](https://badge.fury.io/py/create-dump.svg)
+![MIT License](https://img.shields.io/badge/License-MIT-yellow.svg)
+![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue.svg)
+![CI](https://github.com/dhruv13x/create-dump/actions/workflows/publish.yml/badge.svg)
+![Codecov](https://codecov.io/gh/dhruv13x/create-dump/graph/badge.svg)
 
 **Enterprise-Grade Code Dump Utility for Monorepos**
 
@@ -13,7 +13,7 @@ It generates branded Markdown dumps with Git metadata, integrity checksums, flex
 retention policies, path safety, full concurrency, and SRE-grade observability.
 
 Designed for SRE-heavy environments (Telegram bots, microservices, monorepos), it ensures
-**reproducible snapshots for debugging, forensics, compliance audits, and CI/CD pipelines**.
+**reproducible snapshots for debugging, forensics, compliance audits, and CI/CD pipelines**. It also includes a `rollback` command to restore a project from a dump file.
 
 Built for Python 3.11+, leveraging **AnyIO**, Pydantic, Typer, Rich, and Prometheus metrics.
 
@@ -36,6 +36,9 @@ create-dump batch --root ./monorepo --archive --keep-last 5
 # SRE / Git-only dump in watch mode with secret redaction
 create-dump single --git-ls-files --watch --scan-secrets --hide-secrets
 
+# Rollback a dump file to a new directory
+create-dump rollback --file ./dumps/my-snapshot.md
+
 # Output example:
 # dumps/my-snapshot_all_create_dump_20250101_121045.md
 # dumps/my-snapshot_all_create_dump_20250101_121045.md.sha256
@@ -55,6 +58,9 @@ create-dump single --git-ls-files --watch --scan-secrets --hide-secrets
   * **Flexible Archiving**
     Automatically archive old dumps into **ZIP, tar.gz, or tar.bz2** formats. Includes integrity validation and retention policies (e.g., "keep last N").
 
+  * **Project Rollback & Restore**
+    Includes a `rollback` command to rehydrate a full project structure from a `.md` dump file, with SHA256 integrity verification.
+
   * **Git-Native Collection**
     Use `git ls-files` for fast, accurate file discovery (`--git-ls-files`) or dump only changed files (`--diff-since <ref>`).
 
@@ -65,7 +71,7 @@ create-dump single --git-ls-files --watch --scan-secrets --hide-secrets
     Integrates `detect-secrets` to scan files during processing. Can fail the dump (`--scan-secrets`) or redact secrets in-place (`--hide-secrets`).
 
   * **Safety & Integrity**
-    SHA256 hashing, atomic writes, async-safe path guards (prevents Zip-Slip), and orphan quarantine.
+    SHA256 hashing for all dumps, atomic writes, async-safe path guards (prevents Zip-Slip & Path Traversal), and orphan quarantine.
 
   * **Observability**
     Prometheus metrics (e.g., `create_dump_duration_seconds`, `create_dump_files_total`).
@@ -90,14 +96,14 @@ pip install create-dump
 ### From Source
 
 ```bash
-git clone https://github.com/dhruv/create-dump.git
+git clone https://github.com/dhruv13x/create-dump.git 
 cd create-dump
 pip install -e .[dev]
 ```
 
 ### Docker
 
-```bash
+```dockerfile
 FROM python:3.12-slim
 RUN pip install create-dump
 ENTRYPOINT ["create-dump"]
@@ -142,7 +148,7 @@ excluded_dirs = ["__pycache__", ".git", ".venv", "node_modules"]
 # Prometheus export port
 metrics_port = 8000
 
-# --- New v8 Feature Flags ---
+# --- New v9 Feature Flags ---
 
 # Use 'git ls-files' by default for collection
 # git_ls_files = true
@@ -186,33 +192,58 @@ create-dump batch --root ./monorepo --dirs "src,tests" --keep-last 10 --archive
 create-dump batch --root ./monorepo --archive-all --archive-format tar.gz
 ```
 
------
+### 🗃️ Rollback & Restore
 
-## 🗃️ Archiving Workflow
+You can instantly restore a project structure from a dump file using the `rollback` command.
+It verifies the file's integrity using the accompanying `.sha256` file and then recreates the
+directory and all files in a safe, sandboxed folder.
 
-1.  Detect MD/SHA pairs
-2.  Group by prefix (e.g., `src_`, `tests_`)
-3.  Archive (ZIP/TAR) with verification
-4.  Prune old dumps based on retention
-5.  Cleanup + SHA generation
+```bash
+# Find the latest dump in the current directory and restore it
+create-dump rollback .
+
+# Restore from a specific file
+create-dump rollback --file my_project_dump.md
+
+# Do a dry run to see what files would be created
+create-dump rollback --dry-run
+```
+
+This creates a new directory like `./all_create_dump_rollbacks/my_project_dump/` containing the restored code.
 
 -----
 
 ## 🏗️ Architecture Overview
 
-┌───────────────┐    ┌─────────────────┐    ┌───────────────────┐
-│   CLI (Typer) │──▶ │  Orchestrator   │──▶ │   Single/Batch     │
-└───────────────┘    └─────────────────┘    └───────────────────┘
-│
-▼
-┌───────────────┐    ┌─────────────────┐    ┌───────────────────┐
-│ Config (TOML) │◀──▶ │  Core (Models) │◀──▶ │ Logging/Utils     │
-└───────────────┘    └─────────────────┘    └───────────────────┘
-│
-▼
-┌───────────────┐    ┌─────────────────┐    ┌───────────────────┐
-│   Collector   │──▶ │ Writer (MD/Zip) │──▶ │  Archiver (Zip)    │
-└───────────────┘    └─────────────────┘    └───────────────────┘
+```
+┌─────────────────┐
+│   CLI (Typer)   │
+│ (single, batch, │
+│  init, rollback)│
+└────────┬────────┘
+         │
+┌────────▼────────┐
+│ Config / Models │
+│    (core.py)    │
+└─────────────────┘
+         │
+┌─────────────────┴─────────────────┐
+│                                   │
+▼                                   ▼
+┌─────────────────┐               ┌───────────────────┐
+│   DUMP FLOW     │               │   RESTORE FLOW    │
+│ (Collect)       │               │   (Verify SHA256) │
+│      │          │               │         │         │
+│      ▼          │               │         ▼         │
+│ (Process/Scan)  │               │   (Parse .md)     │
+│      │          │               │         │         │
+│      ▼          │               │         ▼         │
+│ (Write MD/JSON) │               │   (Rehydrate Files) │
+│      │          │               │                   │
+│      ▼          │               └───────────────────┘
+│ (Archive/Prune) │
+└─────────────────┘
+```
 
 -----
 
@@ -242,7 +273,7 @@ mypy src/
 
   * **Secret Scanning** & Redaction (`detect-secrets`)
   * **Async-Safe Path Guards** (Prevents traversal & Zip-Slip)
-  * Archive Integrity + SHA256 Validation
+  * Archive Integrity + SHA256 Validation (on Dump & Restore)
   * `tenacity` Retries on I/O
   * Prometheus Metrics on `:8000/metrics`
   * Graceful `SIGINT`/`SIGTERM` Cleanup Handlers

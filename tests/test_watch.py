@@ -121,7 +121,7 @@ class TestFileWatcher:
         """
         Test Case 3: (Error Handling)
         Validates that an exception in dump_func is caught, logged,
-        and does not crash the debouncer.
+        and does not crash the debouncer. (Covers line 45->28)
         """
         watcher = FileWatcher(test_project.root, mock_dump_func, quiet=False)
         
@@ -200,3 +200,88 @@ class TestFileWatcher:
         mock_path_instance.watch.assert_called_once_with(recursive=True)
         # 4. The event was set
         mock_event.set.assert_called_once()
+
+    # --- NEW P2 TESTS ---
+        
+    async def test_debouncer_error_handling_quiet(
+        self, test_project, mock_dump_func, mock_sleep, mock_styled_print, mock_logger
+    ):
+        """
+        Test Case 5: (Error Handling - Quiet)
+        Validates that an exception in dump_func is logged but NOT printed
+        when in quiet mode. (Covers line 45->28 and skips 47)
+        """
+        watcher = FileWatcher(test_project.root, mock_dump_func, quiet=True)
+        
+        test_exception = Exception("Simulated dump error")
+        completion_event = anyio.Event()
+
+        async def mock_side_effect():
+            try:
+                raise test_exception
+            finally:
+                completion_event.set()
+        
+        mock_dump_func.side_effect = mock_side_effect
+
+        async with anyio.create_task_group() as tg:
+            tg.start_soon(watcher._debouncer)
+            watcher.debounce_event.set()
+            with anyio.move_on_after(2):
+                await completion_event.wait()
+            tg.cancel_scope.cancel()
+
+        # --- Assertions ---
+        mock_dump_func.assert_called_once()
+        # It logged the error
+        mock_logger.error.assert_called_once_with(
+            "Error in watched dump run", error=str(test_exception)
+        )
+        # It did NOT print the error
+        mock_styled_print.assert_not_called()
+
+    async def test_start_keyboard_interrupt(
+        self, test_project, mock_dump_func, mock_styled_print, mocker
+    ):
+        """
+        Test Case 6: (KeyboardInterrupt)
+        Validates that a KeyboardInterrupt during the watch loop is caught
+        and printed. (Covers lines 57-59)
+        """
+        watcher = FileWatcher(test_project.root, mock_dump_func, quiet=False)
+
+        # 🐞 FIX: Mock the create_task_group context manager to raise the interrupt
+        # This simulates the interrupt happening *during* the watch.
+        mock_task_group = mocker.patch(
+            "anyio.create_task_group",
+            side_effect=KeyboardInterrupt
+        )
+
+        # Run the 'start' method. It should catch the interrupt and exit.
+        await watcher.start()
+
+        # --- Assertions ---
+        # Assert the task group was entered
+        mock_task_group.assert_called_once()
+        # Assert the final "stopped" message was printed
+        mock_styled_print.assert_called_with("\n[cyan]Watch mode stopped.[/cyan]")
+        
+    async def test_start_keyboard_interrupt_quiet(
+        self, test_project, mock_dump_func, mock_styled_print, mocker
+    ):
+        """
+        Test Case 7: (KeyboardInterrupt - Quiet)
+        Validates that a KeyboardInterrupt is caught but NOT printed
+        when in quiet mode. (Covers line 58)
+        """
+        watcher = FileWatcher(test_project.root, mock_dump_func, quiet=True)
+
+        mocker.patch(
+            "anyio.create_task_group",
+            side_effect=KeyboardInterrupt
+        )
+
+        await watcher.start()
+
+        # Assert that the "stopped" message was NOT printed
+        mock_styled_print.assert_not_called()

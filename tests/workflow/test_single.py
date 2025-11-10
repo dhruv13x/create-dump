@@ -456,3 +456,69 @@ class TestSingleRunOrchestrator:
         # ⚡ FIX: Assert metric label
         mock_orchestrator_deps["DUMP_DURATION"].labels.assert_called_with(collector="walk")
 # [TEST_SKELETON_END]
+
+
+    async def test_run_git_ls_collector_metric(
+        self, orchestrator_instance, mock_orchestrator_deps
+    ):
+        """
+        Covers line 234 (git_ls collector metric label).
+        """
+        orchestrator_instance.git_ls_files = True
+        orchestrator_instance.diff_since = None # Ensure diff is not used
+
+        await orchestrator_instance.run()
+        
+        mock_orchestrator_deps["DUMP_DURATION"].labels.assert_called_with(collector="git_ls")
+
+    async def test_run_dry_run_prints_files(
+        self, orchestrator_instance, mock_orchestrator_deps
+    ):
+        """
+        Covers lines 190-198 (dry run prints files).
+        """
+        orchestrator_instance.dry_run = True
+        orchestrator_instance.quiet = False
+        mock_orchestrator_deps["collector_instance"].collect.return_value = ["a.py", "b.py"]
+        mock_styled_print = mock_orchestrator_deps["styled_print"]
+
+        with pytest.raises(Exit) as e:
+            await orchestrator_instance.run()
+        
+        assert e.value.exit_code == 0
+        mock_styled_print.assert_any_call("[green]✅ Dry run: Would process listed files.[/green]")
+        mock_styled_print.assert_any_call(" - a.py")
+        mock_styled_print.assert_any_call(" - b.py")
+
+    async def test_run_dest_outside_root_warns(
+        self, orchestrator_instance, mock_orchestrator_deps, mocker, test_project
+    ):
+        """
+        Covers line 155 (dest outside root warning).
+        """
+        orchestrator_instance.dest = Path("/tmp/outside_dest")
+        
+        mock_logger = mocker.patch("create_dump.workflow.single.logger")
+        # Mock safe_is_within to return False
+        mocker.patch("create_dump.workflow.single.safe_is_within", new_callable=AsyncMock, return_value=False)
+
+        await orchestrator_instance.run()
+        
+        mock_logger.warning.assert_called_once_with("Absolute dest outside root; proceeding with caution.")
+
+    async def test_get_total_size_sync_handles_file_not_found(
+        self, orchestrator_instance, mocker
+    ):
+        """
+        Covers lines 124-125 (FileNotFoundError in _get_total_size_sync).
+        """
+        orchestrator_instance.root = Path("/fake/root") # Set a real path
+        
+        # Mock Path.stat to raise FileNotFoundError
+        mock_stat = mocker.patch("pathlib.Path.stat", side_effect=FileNotFoundError)
+        
+        # Call the sync function directly (it's what run_sync does)
+        size = orchestrator_instance._get_total_size_sync(["nonexistent.py"])
+        
+        assert size == 0
+        mock_stat.assert_called_once()

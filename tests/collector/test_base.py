@@ -8,7 +8,9 @@ from __future__ import annotations
 import pytest
 import anyio
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch, ANY
+# ✨ NEW: Import the real anyio.Path for spec-ing
+from anyio import Path as RealAnyIOPath
 
 # Import the class to test
 from create_dump.collector.base import CollectorBase
@@ -36,7 +38,8 @@ def mock_stat():
 @pytest.fixture
 def mock_anyio_path(mocker, mock_stat):
     """Fixture to create a mock anyio.Path object."""
-    path_mock = AsyncMock(spec=anyio.Path)
+    # 🐞 FIX: Use the real class for the spec
+    path_mock = AsyncMock(spec=RealAnyIOPath)
     path_mock.exists = AsyncMock(return_value=True)
     path_mock.stat = AsyncMock(return_value=mock_stat)
     
@@ -89,18 +92,15 @@ dist
             use_gitignore=True
         )
 
-        # 🐞 FIX: Use the unique pattern
         assert collector._exclude_spec.match_file("app.unique_log")
         assert collector._exclude_spec.match_file("build/app.exe")
         assert collector._exclude_spec.match_file("dist/my_app.zip")
-        # Should still have defaults
         assert collector._exclude_spec.match_file("test.pyc")
 
     async def test_setup_specs_no_gitignore(self, default_config: Config, test_project):
         """
         Tests that .gitignore is ignored when use_gitignore=False.
         """
-        # 🐞 FIX: Use a unique pattern not in default_excludes
         await test_project.create({".gitignore": "*.unique_log"})
 
         collector = DummyCollector(
@@ -109,10 +109,7 @@ dist
             use_gitignore=False  # Explicitly disable
         )
 
-        # 🐞 FIX: Check the unique pattern
-        # .gitignore pattern should NOT match
         assert not collector._exclude_spec.match_file("app.unique_log")
-        # Defaults should still be present
         assert collector._exclude_spec.match_file("test.pyc")
 
     async def test_setup_specs_custom_patterns(self, default_config: Config, test_project):
@@ -127,7 +124,6 @@ dist
         )
         
         assert collector._include_spec.match_file("my_file.custom")
-        # 🐞 FIX: Test is wrong. Includes are ADDITIVE, not overriding.
         assert collector._include_spec.match_file("my_file.py") # Defaults are additive
 
         assert collector._exclude_spec.match_file("my_file.default")
@@ -168,7 +164,6 @@ dist
 
     async def test_should_include_async_too_large(
         self, default_config: Config, test_project, mock_anyio_path, mock_stat, mock_is_text
-        # 🐞 FIX: Add mock_is_text fixture
     ):
         """Tests that a file exceeding max_file_size_kb is skipped."""
         default_config.max_file_size_kb = 10  # 10KB max
@@ -226,7 +221,7 @@ dist
             "src/data.bin",
             "README.md",
             "app.log",
-            "app.unique_log", # 🐞 FIX: Add file to test .gitignore
+            "app.unique_log",
             "non_existent_file.py",
         ]
 
@@ -234,3 +229,83 @@ dist
 
         assert filtered == ["README.md", "src/main.py"]
         
+    # --- NEW P1 TESTS ---
+
+    async def test_setup_specs_gitignore_true_but_no_file_exists(
+        self, default_config: Config, test_project, mocker
+    ):
+        """
+        Covers lines 62->72 (use_gitignore=True, but no .gitignore file).
+        """
+        mock_logger_debug = mocker.patch("create_dump.collector.base.logger.debug")
+        
+        # Ensure no .gitignore exists (test_project is clean)
+        collector = DummyCollector(
+            config=default_config,
+            root=test_project.root,
+            use_gitignore=True
+        )
+
+        # Assert that "Gitignore integrated" was never logged
+        for call in mock_logger_debug.call_args_list:
+            assert call[0][0] != "Gitignore integrated"
+
+    async def test_should_include_async_stat_error(
+        self, default_config: Config, test_project, mock_anyio_path, mocker
+    ):
+        """
+        Covers lines 124-126 (OSError during stat).
+        """
+        mock_logger_warn = mocker.patch("create_dump.collector.base.logger.warning")
+        mock_anyio_path.stat.side_effect = OSError("Permission denied")
+        
+        collector = DummyCollector(config=default_config, root=test_project.root)
+        
+        result = await collector._should_include(mock_anyio_path, "src/file.py")
+        
+        assert result is False
+        mock_logger_warn.assert_called_once_with(
+            "File check failed (OSError): src/file.py", error="Permission denied"
+        )
+
+    async def test_filter_files_absolute_path_outside_root(
+        self, default_config: Config, test_project, mocker
+    ):
+        """
+        Covers lines 135-138 (absolute path outside root).
+        """
+        mock_logger_warn = mocker.patch("create_dump.collector.base.logger.warning")
+        collector = DummyCollector(config=default_config, root=test_project.root)
+        
+        # Need a "good" file to ensure the list isn't just empty
+        await test_project.create({"src/main.py": "content"})
+        
+        raw_files = ["/etc/passwd", "src/main.py"]
+        filtered = await collector.filter_files(raw_files)
+        
+        assert filtered == ["src/main.py"]
+        mock_logger_warn.assert_called_once_with(
+            "Skipping git path outside root", path="/etc/passwd"
+        )
+
+    async def test_filter_files_generic_exception(
+        self, default_config: Config, test_project, mocker
+    ):
+        """
+        Covers lines 142-143 (generic exception during _matches).
+        """
+        mock_logger_warn = mocker.patch("create_dump.collector.base.logger.warning")
+        collector = DummyCollector(config=default_config, root=test_project.root)
+        
+        # Mock _matches to fail
+        mocker.patch.object(
+            collector, "_matches", side_effect=Exception("Unexpected error")
+        )
+        
+        raw_files = ["src/main.py"]
+        filtered = await collector.filter_files(raw_files)
+        
+        assert filtered == []
+        mock_logger_warn.assert_called_once_with(
+            "Skipping file due to error", path="src/main.py", error="Unexpected error"
+        )

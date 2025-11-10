@@ -12,6 +12,8 @@ from unittest.mock import AsyncMock, MagicMock, call
 import anyio
 # 🐞 FIX: Import TimeoutError from asyncio, not anyio
 from asyncio import TimeoutError
+# ✨ NEW: Import the real anyio.Path for spec-ing
+from anyio import Path as RealAnyIOPath
 
 # Import the class to test
 from create_dump.processor import FileProcessor, ProcessorMiddleware
@@ -54,28 +56,28 @@ def mock_paths(mocker, temp_dir: str):
     # Simulate streaming read (peek + chunk + end)
     mock_read_file.read.side_effect = ["hello", " world", ""]
     mock_read_context = AsyncMock(__aenter__=AsyncMock(return_value=mock_read_file))
-    mock_read_path = AsyncMock(spec=anyio.Path)
+    # 🐞 FIX: Use the real class for the spec
+    mock_read_path = AsyncMock(spec=RealAnyIOPath)
     mock_read_path.open = AsyncMock(return_value=mock_read_context)
 
     # 2. Mock the temp-file-to-be-written
     mock_write_file = AsyncMock()
     mock_write_context = AsyncMock(__aenter__=AsyncMock(return_value=mock_write_file))
-    mock_write_path = AsyncMock(spec=anyio.Path)
+    # 🐞 FIX: Use the real class for the spec
+    mock_write_path = AsyncMock(spec=RealAnyIOPath)
     mock_write_path.open = AsyncMock(return_value=mock_write_context)
     mock_write_path.unlink = AsyncMock()
 
     # The expected path of the temp file
     temp_file_path_str = str(Path(temp_dir) / "test-uuid.tmp")
 
-    # 🐞 FIX: Add __fspath__ so Path(mock) works as expected.
-    # __str__ is a fallback, but __fspath__ is the correct protocol.
     mock_write_path.__fspath__ = MagicMock(return_value=temp_file_path_str)
     mock_write_path.__str__ = MagicMock(return_value=temp_file_path_str)
 
 
-    # 🐞 FIX: Mock the two-step path creation: anyio.Path(temp_dir) / "filename"
     # Mock for anyio.Path(temp_dir)
-    mock_temp_dir_path = AsyncMock(spec=anyio.Path)
+    # 🐞 FIX: Use the real class for the spec
+    mock_temp_dir_path = AsyncMock(spec=RealAnyIOPath)
     # Mock the "/" operator to return the final write path
     mock_temp_dir_path.__truediv__ = MagicMock(return_value=mock_write_path)
 
@@ -84,11 +86,22 @@ def mock_paths(mocker, temp_dir: str):
         path_str = str(path_arg)
         if path_str == "src/main.py":
             return mock_read_path
-        # 🐞 FIX: Intercept the call to anyio.Path(temp_dir)
         if path_str == temp_dir:
             return mock_temp_dir_path
-        # Fallback for any other Path calls
-        return AsyncMock()
+
+        # ✨ NEW: Add case for empty file test
+        if path_str == "src/empty.py":
+            mock_empty_read = AsyncMock()
+            mock_empty_read.read.side_effect = ["", ""] # First read is empty
+            mock_empty_context = AsyncMock(__aenter__=AsyncMock(return_value=mock_empty_read))
+            # 🐞 FIX: Use the real class for the spec
+            mock_empty_path = AsyncMock(spec=RealAnyIOPath)
+            mock_empty_path.open = AsyncMock(return_value=mock_empty_context)
+            return mock_empty_path
+
+        # Fallback
+        # 🐞 FIX: Use the real class for the spec
+        return AsyncMock(spec=RealAnyIOPath)
 
     mocker.patch("create_dump.processor.anyio.Path", side_effect=path_side_effect)
 
@@ -121,7 +134,6 @@ class TestFileProcessor:
         assert dump_file.error is None
         assert dump_file.path == "src/main.py"
         assert dump_file.language == "python"
-        # This assertion will now pass thanks to __fspath__
         assert dump_file.temp_path == Path(temp_dir) / "test-uuid.tmp"
 
         # Check that streaming occurred (peek + chunk)
@@ -152,9 +164,6 @@ class TestFileProcessor:
         assert "Permission denied" in dump_file.error
         assert dump_file.temp_path is None
 
-        # Check cleanup and metrics
-        # 🐞 FIX: The code *correctly* calls unlink in the except block.
-        # The test's original expectation was wrong.
         mock_write_path.unlink.assert_called_once_with(missing_ok=True)
         m_errors_total.labels.assert_called_once_with(type="process")
         m_errors_total.labels.return_value.inc.assert_called_once()
@@ -176,8 +185,6 @@ class TestFileProcessor:
         assert "Disk full" in dump_file.error
         assert dump_file.temp_path is None
 
-        # Check cleanup and metrics
-        # CRITICAL: Ensure temp file is unlinked even if write fails
         mock_write_path.unlink.assert_called_once()
         m_errors_total.labels.assert_called_once_with(type="process")
         m_errors_total.labels.return_value.inc.assert_called_once()
@@ -260,7 +267,10 @@ class TestFileProcessor:
         assert mock_process_file.call_count == 3
 
     async def test_dump_concurrent_timeout(self, mocker, temp_dir, mocked_metrics):
-        """Test Case 7: dump_concurrent() wrapper handles Timeouts."""
+        """
+        Test Case 7: dump_concurrent() wrapper handles Timeouts.
+        Covers lines 139-141.
+        """
         _, m_errors_total = mocked_metrics
 
         # Mock fail_after to immediately raise a TimeoutError
@@ -282,3 +292,81 @@ class TestFileProcessor:
         # Check metrics
         m_errors_total.labels.assert_called_once_with(type="timeout")
         m_errors_total.labels.return_value.inc.assert_called_once()
+
+    # --- NEW TESTS TO COVER MISSED LINES ---
+        
+    async def test_dump_concurrent_generic_exception(self, mocker, temp_dir, mocked_metrics):
+        """
+        Test Case 8: dump_concurrent() wrapper handles generic Exceptions.
+        Covers lines 142-143.
+        """
+        _, m_errors_total = mocked_metrics
+        test_exception = Exception("Unhandled generic error")
+
+        # Mock process_file to raise the exception
+        mocker.patch.object(
+            FileProcessor, "process_file", side_effect=test_exception
+        )
+
+        processor = FileProcessor(temp_dir)
+        files_list = ["a.py"]
+        results = await processor.dump_concurrent(files_list, progress=False)
+
+        # Check that a failure DumpFile was returned
+        assert len(results) == 1
+        assert results[0].path == "a.py"
+        assert results[0].error == f"Unhandled exception: {test_exception}"
+
+        # Check metrics
+        m_errors_total.labels.assert_called_once_with(type="process")
+        m_errors_total.labels.return_value.inc.assert_called_once()
+
+    async def test_dump_concurrent_no_progress(self, mocker, temp_dir):
+        """
+        Test Case 9: dump_concurrent() with progress=False.
+        Covers lines 130-132 (else branch) and 135 (finally branch).
+        """
+        # Mock the Progress bar to ensure it's not called
+        mock_progress_cls = mocker.patch("create_dump.processor.Progress")
+        
+        # Mock process_file to check it's still called
+        mock_process_file = mocker.patch.object(
+            FileProcessor, "process_file", new_callable=AsyncMock
+        )
+
+        processor = FileProcessor(temp_dir)
+        files_list = ["a.py", "b.py"]
+        await processor.dump_concurrent(files_list, progress=False)
+
+        # Assert Progress bar was not used
+        mock_progress_cls.assert_not_called()
+        
+        # Assert files were still processed
+        assert mock_process_file.call_count == 2
+
+    async def test_process_file_empty(
+        self, temp_dir, mock_paths, mock_middleware, mocked_metrics
+    ):
+        """
+        Test Case 10: process_file() with an empty file.
+        Covers line 71 (if peek:) being false.
+        """
+        _, _, mock_write_file = mock_paths
+        m_files_processed, _ = mocked_metrics
+
+        processor = FileProcessor(temp_dir, middlewares=[mock_middleware])
+        # "src/empty.py" is configured in mock_paths to return "" on first read
+        dump_file = await processor.process_file("src/empty.py")
+
+        # Check DumpFile state
+        assert dump_file.error is None
+        assert dump_file.path == "src/empty.py"
+        assert dump_file.temp_path is not None
+
+        # Check that write was NOT called
+        mock_write_file.write.assert_not_called()
+
+        # Check middleware and metrics (still a success)
+        mock_middleware.process.assert_called_once_with(dump_file)
+        m_files_processed.labels.assert_called_once_with(status="success")
+        m_files_processed.labels.return_value.inc.assert_called_once()
