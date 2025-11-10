@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, MagicMock, patch, ANY
 from typing import List, AsyncGenerator
 
 import anyio
-import pytest_anyio
+import pytest_asyncio
 
 # [TEST_SKELETON_START]
 # Add this import at the top of tests/test_orchestrator.py
