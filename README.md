@@ -249,14 +249,14 @@ This creates a new directory like `./all_create_dump_rollbacks/my_project_dump/`
 
 ## 🧪 Testing & Development
 
-Run the full test suite using `pytest`:
+Run the full test suite using `pytest`. It's recommended to run `pytest` as a module to ensure it uses the correct Python interpreter and dependencies:
 
 ```bash
 # Install dev dependencies
 pip install -e .[dev]
 
 # Run tests with coverage
-pytest --cov=create_dump --cov-report=html
+python -m pytest --cov=create_dump --cov-report=html
 ```
 
 Run linters and formatters:
