@@ -12,6 +12,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import List, Optional
 from typer import Exit
+from importlib import metadata
 
 import anyio
 
@@ -27,10 +28,15 @@ from ..metrics import DUMP_DURATION, metrics_server
 from ..system import get_git_meta
 from ..processor import FileProcessor, ProcessorMiddleware
 from ..writing import ChecksumWriter, MarkdownWriter, JsonWriter
-from ..version import VERSION
 from ..scanning.secret import SecretScanner
 from ..scanning.todo import TodoScanner
 from ..notifications import send_ntfy_notification
+
+try:
+    __version__ = metadata.version("create-dump")
+except metadata.PackageNotFoundError:
+    # package is not installed
+    __version__ = "0.0.0"
 
 
 class SingleRunOrchestrator:
@@ -281,14 +287,14 @@ class SingleRunOrchestrator:
                         # Step 3 - Format output
                         if self.format == "json":
                             writer = JsonWriter(outfile)
-                            await writer.write(processed_files, gmeta, VERSION, total_files=total_files, total_loc=total_loc)
+                            await writer.write(processed_files, gmeta, __version__, total_files=total_files, total_loc=total_loc)
                         else:
                             writer = MarkdownWriter(
                                 outfile, 
                                 self.no_toc, 
                                 self.tree_toc,
                             )
-                            await writer.write(processed_files, gmeta, VERSION, total_files=total_files, total_loc=total_loc)
+                            await writer.write(processed_files, gmeta, __version__, total_files=total_files, total_loc=total_loc)
 
                 # Step 4 - Compress
                 if self.compress:

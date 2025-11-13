@@ -12,9 +12,15 @@ from pathlib import Path
 
 # Import the app to test
 from create_dump.cli.main import app
-from create_dump.version import VERSION
+from importlib import metadata
 # 🐞 FIX: Import the function we are checking
 from create_dump.cli.single import run_single
+
+try:
+    __version__ = metadata.version("create-dump")
+except metadata.PackageNotFoundError:
+    # package is not installed
+    __version__ = "0.0.0"
 
 
 # Mark all tests in this file as async-capable
@@ -70,7 +76,7 @@ class TestMainCli:
         """Test Case 1: --version flag prints version and exits."""
         result = cli_runner.invoke(app, ["--version"])
         assert result.exit_code == 0
-        assert f"create-dump v{VERSION}" in result.stdout
+        assert f"create-dump v{__version__}" in result.stdout
 
     def test_batch_subcommand_help(self, cli_runner: CliRunner):
         """Test Case 2: 'batch' subcommand is registered."""

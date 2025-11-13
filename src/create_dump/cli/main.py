@@ -12,17 +12,24 @@ import typer
 from typing import Optional
 from pathlib import Path
 
+from importlib import metadata
+
 # ⚡ REFACTOR: Removed generate_default_config import
 from ..core import load_config
 # ⚡ REFACTOR: Corrected imports from new modules
 from ..logging import setup_logging, styled_print
-from ..version import VERSION
 
 # ⚡ REFACTOR: Import commands and command groups from submodules
 from .single import single
 from .batch import batch_app
 # ✨ NEW: Import the rollback function directly
 from .rollback import rollback
+
+try:
+    __version__ = metadata.version("create-dump")
+except metadata.PackageNotFoundError:
+    # package is not installed
+    __version__ = "0.0.0"
 
 
 app = typer.Typer(
@@ -162,7 +169,7 @@ def main_callback(
     setup_logging(verbose=verbose, quiet=quiet)
 
     if version:
-        styled_print(f"create-dump v{VERSION}")
+        styled_print(f"create-dump v{__version__}")
         raise typer.Exit()
 
     if init:

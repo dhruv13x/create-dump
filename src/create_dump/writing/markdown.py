@@ -11,13 +11,19 @@ import uuid
 from datetime import timezone
 from pathlib import Path
 from typing import List, Optional, Dict, Any
+from importlib import metadata
 
 import anyio
 
 from ..core import DumpFile, GitMeta
 from ..helpers import CHUNK_SIZE, get_language, slugify
 from ..logging import logger
-from ..version import VERSION
+
+try:
+    __version__ = metadata.version("create-dump")
+except metadata.PackageNotFoundError:
+    # package is not installed
+    __version__ = "0.0.0"
 
 
 class MarkdownWriter:
@@ -34,7 +40,7 @@ class MarkdownWriter:
         self.tree_toc = tree_toc
         self.files: List[DumpFile] = []  # Stored for metrics
         self.git_meta: Optional[GitMeta] = None
-        self.version: str = VERSION
+        self.version: str = __version__
         self.total_files: int = 0
         self.total_loc: int = 0
 

@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "create-dump"
-dynamic = ["version"]
+version = "12.0.0"
 description = "Enterprise-grade code dump utility for monorepos"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -68,8 +68,7 @@ dev = [
 [tool.hatch.build.targets.wheel]
 packages = ["src/create_dump"]
 
-[tool.hatch.version]
-path = "src/create_dump/version.py"
+
 
 [tool.ruff]
 line-length = 100
