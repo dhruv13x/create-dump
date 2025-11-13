@@ -21,7 +21,6 @@
 <!-- Usage -->
 ![Downloads](https://img.shields.io/pypi/dm/create-dump.svg)
 ![OS](https://img.shields.io/badge/os-Linux%20%7C%20macOS%20%7C%20Windows-blue.svg)
-![Languages](https://img.shields.io/badge/languages-Python%20%7C%20JavaScript%20%7C%20TypeScript-green.svg)
 [![Python Versions](https://img.shields.io/pypi/pyversions/create-dump.svg)](https://pypi.org/project/create-dump/)
 
 <!-- License -->
