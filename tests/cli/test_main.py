@@ -104,7 +104,7 @@ class TestMainCli:
 
             cli_runner.invoke(app, ["--config", "my_config.toml", "single", "--help"])
 
-            mock_cli_deps["load_config"].assert_called_with(Path("my_config.toml"))
+            mock_cli_deps["load_config"].assert_called_with(Path("my_config.toml"), profile=None)
 
 
 class TestInitWizard:

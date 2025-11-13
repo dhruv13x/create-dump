@@ -42,6 +42,7 @@ class Config(BaseModel):
     git_ls_files: bool = Field(False, description="Use 'git ls-files' for file collection.")
     scan_secrets: bool = Field(False, description="Enable secret scanning.")
     hide_secrets: bool = Field(False, description="Redact found secrets (requires scan_secrets=True).")
+    custom_secret_patterns: List[str] = Field(default_factory=list, description="List of custom regex patterns to scan for secrets.")
 
 
     @field_validator("max_file_size_kb", mode="before")
@@ -85,10 +86,11 @@ class DumpFile(BaseModel):
     language: Optional[str] = None
     temp_path: Optional[Path] = None
     error: Optional[str] = None
+    todos: List[str] = Field(default_factory=list)
 
 
 # 🐞 FIX: Add `_cwd` parameter for testability
-def load_config(path: Optional[Path] = None, _cwd: Optional[Path] = None) -> Config:
+def load_config(path: Optional[Path] = None, _cwd: Optional[Path] = None, profile: Optional[str] = None) -> Config:
     """Loads config from [tool.create-dump] in TOML files."""
     config_data: Dict[str, Any] = {}
     
@@ -111,6 +113,15 @@ def load_config(path: Optional[Path] = None, _cwd: Optional[Path] = None) -> Con
             try:
                 full_data = toml.load(conf_path)
                 config_data = full_data.get("tool", {}).get("create-dump", {})
+                if config_data and profile:
+                    logger.debug("Merging config profile", profile=profile)
+                    profile_data = full_data.get("tool", {}).get("create-dump", {}).get("profile", {}).get(profile, {})
+                    if profile_data:
+                        config_data.update(profile_data)
+                        logger.debug("Profile merged", keys=list(profile_data.keys()))
+                    else:
+                        logger.warning("Config profile not found, using base", profile=profile)
+
                 if config_data:  # Stop if we find it
                     logger.debug("Config loaded", path=conf_path, keys=list(config_data.keys()))
                     break

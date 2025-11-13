@@ -48,6 +48,8 @@ def single(
     diff_since: Optional[str] = typer.Option(None, "--diff-since", help="Only dump files changed since a specific git ref (e.g., 'main')."),
     scan_secrets: bool = typer.Option(False, "--scan-secrets", help="Scan files for secrets. Fails dump if secrets are found."),
     hide_secrets: bool = typer.Option(False, "--hide-secrets", help="Redact found secrets (requires --scan-secrets)."),
+    scan_todos: bool = typer.Option(False, "--scan-todos", help="Scan files for TODO/FIXME tags and append a summary."),
+    notify_topic: Optional[str] = typer.Option(None, "--notify-topic", help="ntfy.sh topic for push notification on completion."),
 
     # Archiving (Unified)
     archive: bool = typer.Option(False, "-a", "--archive", help="Archive prior dumps into ZIP (unified workflow)."),
@@ -153,6 +155,8 @@ def single(
             diff_since,
             scan_secrets,
             hide_secrets,
+            scan_todos,
+            notify_topic,
         )
     except Exit as e:
         if getattr(e, "exit_code", None) == 0 and dry_run:

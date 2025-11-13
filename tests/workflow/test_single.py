@@ -7,7 +7,7 @@ Tests for src/create_dump/workflow/single.py
 from __future__ import annotations
 import pytest
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch, call
+from unittest.mock import AsyncMock, MagicMock, patch, call, ANY
 from typer import Exit
 from tempfile import TemporaryDirectory
 
@@ -87,6 +87,10 @@ def mock_orchestrator_deps(mocker, mock_config):
     mocker.patch(
         "create_dump.workflow.single.SingleRunOrchestrator._get_total_size_sync",
         return_value=1024
+    )
+    mocker.patch(
+        "create_dump.workflow.single.SingleRunOrchestrator._get_stats_sync",
+        return_value=(1, 10)
     )
     
     # 🐞 FIX: Simplified the mock. The lambda's __name__ check conflicted with
@@ -199,7 +203,9 @@ class TestSingleRunOrchestrator:
         # 🐞 FIX: Assert against the returned instance's method
         mock_orchestrator_deps["collector_instance"].collect.assert_called_once()
         mock_orchestrator_deps["FileProcessor"].dump_concurrent.assert_called_once()
-        mock_orchestrator_deps["MarkdownWriter"].write.assert_called_once()
+        mock_orchestrator_deps["MarkdownWriter"].write.assert_called_once_with(
+            ANY, ANY, ANY, total_files=1, total_loc=10
+        )
         mock_orchestrator_deps["ChecksumWriter"].write.assert_called_once()
         
         # ⚡ FIX: Assert metric label
@@ -288,7 +294,8 @@ class TestSingleRunOrchestrator:
 
         # 🐞 FIX: Assert against the class patch object
         mock_orchestrator_deps["SecretScanner"].assert_called_once_with(
-            hide_secrets=False
+            hide_secrets=False,
+            custom_patterns=[]
         )
         # ⚡ FIX: Assert metric label
         mock_orchestrator_deps["DUMP_DURATION"].labels.assert_called_with(collector="walk")
@@ -304,7 +311,8 @@ class TestSingleRunOrchestrator:
 
         # 🐞 FIX: Assert against the class patch object
         mock_orchestrator_deps["SecretScanner"].assert_called_once_with(
-            hide_secrets=True
+            hide_secrets=True,
+            custom_patterns=[]
         )
         # ⚡ FIX: Assert metric label
         mock_orchestrator_deps["DUMP_DURATION"].labels.assert_called_with(collector="walk")
@@ -522,3 +530,96 @@ class TestSingleRunOrchestrator:
         
         assert size == 0
         mock_stat.assert_called_once()
+
+
+    async def test_get_stats_sync(self, orchestrator_instance, test_project):
+        """
+        Tests the _get_stats_sync method.
+        """
+        # 1. Setup
+        await test_project.create({
+            "a.py": "print('hello')\nprint('world')",
+            "b.py": "pass",
+        })
+
+        # 2. Act
+        total_files, total_loc = orchestrator_instance._get_stats_sync(["a.py", "b.py"])
+
+        # 3. Assert
+        assert total_files == 2
+        assert total_loc == 3
+
+
+    async def test_run_sends_notify_on_success(
+        self, orchestrator_instance, mock_orchestrator_deps, mocker
+    ):
+        """
+        Tests that a notification is sent on successful run.
+        """
+        orchestrator_instance.notify_topic = "test"
+        mock_send_ntfy = mocker.patch("create_dump.workflow.single.send_ntfy_notification")
+
+        await orchestrator_instance.run()
+
+        mock_send_ntfy.assert_called_once_with(
+            "test",
+            message=ANY,
+            title="✅ create-dump Success",
+        )
+
+
+    async def test_run_sends_notify_on_failure(
+        self, orchestrator_instance, mock_orchestrator_deps, mocker
+    ):
+        """
+        Tests that a notification is sent on failure.
+        """
+        orchestrator_instance.notify_topic = "test"
+        mock_send_ntfy = mocker.patch("create_dump.workflow.single.send_ntfy_notification")
+        mocker.patch(
+            "create_dump.workflow.single.get_collector",
+            side_effect=Exception("BOOM"),
+        )
+
+        with pytest.raises(Exception, match="BOOM"):
+            await orchestrator_instance.run()
+
+        mock_send_ntfy.assert_called_once_with(
+            "test",
+            message="An unexpected error occurred: BOOM",
+            title="❌ create-dump Error",
+        )
+
+
+    async def test_run_sends_notify_on_dry_run(
+        self, orchestrator_instance, mock_orchestrator_deps, mocker
+    ):
+        """
+        Tests that a notification is sent on dry run.
+        """
+        orchestrator_instance.notify_topic = "test"
+        orchestrator_instance.dry_run = True
+        mock_send_ntfy = mocker.patch("create_dump.workflow.single.send_ntfy_notification")
+
+        with pytest.raises(Exit):
+            await orchestrator_instance.run()
+
+        mock_send_ntfy.assert_called_once_with(
+            "test",
+            message="Dry run completed.",
+            title="ℹ️ create-dump Dry Run",
+        )
+
+
+    async def test_run_no_notify_topic(
+        self, orchestrator_instance, mock_orchestrator_deps, mocker
+    ):
+        """
+        Tests that no notification is sent if notify_topic is None.
+        """
+        orchestrator_instance.notify_topic = None
+        mock_send_ntfy = mocker.patch("create_dump.workflow.single.send_ntfy_notification")
+
+        await orchestrator_instance.run()
+
+        mock_send_ntfy.assert_not_called()

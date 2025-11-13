@@ -35,17 +35,23 @@ class MarkdownWriter:
         self.files: List[DumpFile] = []  # Stored for metrics
         self.git_meta: Optional[GitMeta] = None
         self.version: str = VERSION
+        self.total_files: int = 0
+        self.total_loc: int = 0
 
     async def write(
-        self, 
-        files: List[DumpFile], 
-        git_meta: Optional[GitMeta], 
-        version: str
+        self,
+        files: List[DumpFile],
+        git_meta: Optional[GitMeta],
+        version: str,
+        total_files: int,
+        total_loc: int,
     ) -> None:
         """Writes the final Markdown file from the list of processed files."""
-        self.files = files  # Store for metrics
+        self.files = files
         self.git_meta = git_meta
         self.version = version
+        self.total_files = total_files
+        self.total_loc = total_loc
         
         await self._write_md_streamed()
 
@@ -59,6 +65,8 @@ class MarkdownWriter:
                 await out.write("# 🗃️ Project Code Dump\n\n")
                 await out.write(f"**Generated:** {now.isoformat(timespec='seconds')} UTC\n")
                 await out.write(f"**Version:** {self.version}\n")
+                await out.write(f"**Total Files:** {self.total_files}\n")
+                await out.write(f"**Total Lines:** {self.total_loc}\n")
                 if self.git_meta:
                     await out.write(
                         f"**Git Branch:** {self.git_meta.branch} | **Commit:** {self.git_meta.commit}\n"
@@ -110,6 +118,15 @@ class MarkdownWriter:
                         await out.write(f"{fence}{lang}\n")
                         await out.write(temp_content)
                         await out.write(f"\n{fence}\n\n---\n\n")
+
+                all_todos = [todo for df in self.files if df.todos for todo in df.todos]
+                if all_todos:
+                    await out.write("## 📝 Technical Debt Summary\n\n")
+                    await out.write(f"Found {len(all_todos)} items:\n\n")
+                    await out.write("```text\n")
+                    for item in all_todos:
+                        await out.write(f"- {item}\n")
+                    await out.write("```\n\n---\n\n")
 
             await temp_out.rename(self.outfile)
             logger.info("MD written atomically", path=self.outfile)

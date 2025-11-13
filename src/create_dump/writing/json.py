@@ -26,10 +26,12 @@ class JsonWriter:
         self.files: List[DumpFile] = []  # Stored for metrics
 
     async def write(
-        self, 
-        files: List[DumpFile], 
-        git_meta: Optional[GitMeta], 
-        version: str
+        self,
+        files: List[DumpFile],
+        git_meta: Optional[GitMeta],
+        version: str,
+        total_files: int,
+        total_loc: int,
     ) -> None:
         """Writes the final JSON file from the list of processed files."""
         self.files = files  # Store for metrics
@@ -38,6 +40,8 @@ class JsonWriter:
             "generated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "version": version,
             "git_meta": git_meta.model_dump() if git_meta else None,
+            "total_files": total_files,
+            "total_lines_of_code": total_loc,
             "files": []
         }
 
@@ -47,7 +51,8 @@ class JsonWriter:
                     "path": df.path,
                     "language": df.language,
                     "error": df.error,
-                    "content": None
+                    "content": None,
+                    "todos": df.todos,
                 })
             elif df.temp_path:
                 try:
@@ -56,7 +61,8 @@ class JsonWriter:
                         "path": df.path,
                         "language": df.language,
                         "error": None,
-                        "content": content
+                        "content": content,
+                        "todos": df.todos,
                     })
                 except Exception as e:
                     logger.error("Failed to read temp file for JSON dump", path=df.path, error=str(e))

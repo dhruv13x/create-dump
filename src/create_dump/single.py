@@ -57,6 +57,8 @@ async def run_single(
     diff_since: Optional[str] = None,
     scan_secrets: bool = False,
     hide_secrets: bool = False,
+    scan_todos: bool = False,
+    notify_topic: Optional[str] = None,
 ) -> None:
     
     root = root.resolve()
@@ -104,6 +106,8 @@ async def run_single(
         diff_since=diff_since,
         scan_secrets=scan_secrets,
         hide_secrets=hide_secrets,
+        scan_todos=scan_todos,
+        notify_topic=notify_topic,
     )
 
     # ⚡ REFACTOR: Top-level control flow

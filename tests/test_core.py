@@ -178,3 +178,68 @@ dest = "from_pyproject"
     config = load_config(path=explicit_path, _cwd=test_project.root)
 
     assert config.dest == Path("from_explicit_path")
+
+
+async def test_load_config_with_profile(test_project):
+    """
+    Tests that a config profile correctly overrides base settings.
+    """
+    await test_project.create({
+        "pyproject.toml": """
+[tool.create-dump]
+git_meta = true
+[tool.create-dump.profile.ci]
+git_meta = false
+"""
+    })
+
+    config = load_config(_cwd=test_project.root, profile="ci")
+    assert config.git_meta is False
+
+
+async def test_load_config_with_nonexistent_profile(test_project, mocker):
+    """
+    Tests that a warning is logged when a nonexistent profile is requested.
+    """
+    await test_project.create({
+        "pyproject.toml": """
+[tool.create-dump]
+git_meta = true
+"""
+    })
+
+    mock_logger_warning = mocker.patch("create_dump.core.logger.warning")
+    config = load_config(_cwd=test_project.root, profile="nonexistent")
+
+    assert config.git_meta is True
+    mock_logger_warning.assert_called_once_with(
+        "Config profile not found, using base", profile="nonexistent"
+    )
+
+
+async def test_load_config_profile_merges_not_replaces(test_project):
+    """
+    Tests that a profile with one setting doesn't nullify other base settings.
+    """
+    await test_project.create({
+        "pyproject.toml": """
+[tool.create-dump]
+git_meta = true
+dest = "dumps"
+[tool.create-dump.profile.ci]
+git_meta = false
+"""
+    })
+
+    config = load_config(_cwd=test_project.root, profile="ci")
+    assert config.git_meta is False
+    assert config.dest == Path("dumps")
+
+
+def test_config_custom_secret_patterns():
+    """
+    Tests that the Config model correctly stores custom secret patterns.
+    """
+    patterns = ["API_KEY = '.*'"]
+    config = Config(custom_secret_patterns=patterns)
+    assert config.custom_secret_patterns == patterns
