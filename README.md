@@ -1,4 +1,4 @@
-![logo](logo.png)
+![logo](https://raw.githubusercontent.com/dhruv13x/create-dump/main/logo.png)
 
 # create-dump
 
