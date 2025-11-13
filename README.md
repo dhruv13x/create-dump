@@ -35,12 +35,6 @@
 
 # create-dump
 
-![PyPI](https://badge.fury.io/py/create-dump.svg)
-![MIT License](https://img.shields.io/badge/License-MIT-yellow.svg)
-![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue.svg)
-![CI](https://github.com/dhruv13x/create-dump/actions/workflows/publish.yml/badge.svg)
-![Codecov](https://codecov.io/gh/dhruv13x/create-dump/graph/badge.svg)
-
 **Enterprise-Grade Code Dump Utility for Monorepos**
 
 `create-dump` is a production-ready CLI tool for automated code archival in large-scale monorepos.
