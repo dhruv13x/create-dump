@@ -42,6 +42,10 @@ class Config(BaseModel):
     git_ls_files: bool = Field(False, description="Use 'git ls-files' for file collection.")
     scan_secrets: bool = Field(False, description="Enable secret scanning.")
     hide_secrets: bool = Field(False, description="Redact found secrets (requires scan_secrets=True).")
+    scan_todos: bool = Field(False, description="Enable TODO/FIXME scanning.")
+    custom_secret_patterns: List[str] = Field(
+        default_factory=list, description="Custom regex patterns for secret scanning."
+    )
 
 
     @field_validator("max_file_size_kb", mode="before")
@@ -88,7 +92,11 @@ class DumpFile(BaseModel):
 
 
 # 🐞 FIX: Add `_cwd` parameter for testability
-def load_config(path: Optional[Path] = None, _cwd: Optional[Path] = None) -> Config:
+def load_config(
+    path: Optional[Path] = None,
+    _cwd: Optional[Path] = None,
+    profile: Optional[str] = None,
+) -> Config:
     """Loads config from [tool.create-dump] in TOML files."""
     config_data: Dict[str, Any] = {}
     
@@ -99,10 +107,10 @@ def load_config(path: Optional[Path] = None, _cwd: Optional[Path] = None) -> Con
         [path]
         if path
         else [
-            Path.home() / ".create_dump.toml", # 1. Home dir
-            cwd / ".create_dump.toml",         # 2. CWD .create_dump.toml
-            cwd / "create_dump.toml",          # 3. CWD create_dump.toml
-            cwd / "pyproject.toml",          # 4. CWD pyproject.toml
+            Path.home() / ".create_dump.toml",  # 1. Home dir
+            cwd / ".create_dump.toml",          # 2. CWD .create_dump.toml
+            cwd / "create_dump.toml",           # 3. CWD create_dump.toml
+            cwd / "pyproject.toml",           # 4. CWD pyproject.toml
         ]
     )
     
@@ -110,12 +118,24 @@ def load_config(path: Optional[Path] = None, _cwd: Optional[Path] = None) -> Con
         if conf_path.exists():
             try:
                 full_data = toml.load(conf_path)
-                config_data = full_data.get("tool", {}).get("create-dump", {})
-                if config_data:  # Stop if we find it
-                    logger.debug("Config loaded", path=conf_path, keys=list(config_data.keys()))
+                tool_data = full_data.get("tool", {}).get("create-dump", {})
+                if tool_data:  # Stop if we find it
+                    config_data = tool_data
+                    logger.debug(
+                        "Config loaded",
+                        path=conf_path,
+                        keys=list(config_data.keys()),
+                    )
+                    if profile:
+                        profile_data = (
+                            config_data.get("profile", {}).get(profile, {})
+                        )
+                        config_data.update(profile_data)
                     break
             except (toml.TomlDecodeError, OSError) as e:
-                logger.warning("Config load failed", path=conf_path, error=str(e))
+                logger.warning(
+                    "Config load failed", path=conf_path, error=str(e)
+                )
     return Config(**config_data)
 
 

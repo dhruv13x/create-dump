@@ -16,18 +16,73 @@ from detect_secrets.core.potential_secret import PotentialSecret
 from .core import DumpFile
 from .logging import logger
 from .metrics import ERRORS_TOTAL
+import re
+
 
 # 🐞 FIX: Create a private, patchable symbol for run_sync
 _run_sync = to_thread.run_sync
 
 
+class TodoScanner:
+    """Processor middleware to scan for TODOs, FIXMEs, etc."""
+
+    def __init__(self):
+        self.findings: List[Dict[str, Any]] = []
+        self.todo_pattern = re.compile(r"(TODO|FIXME|HACK|TECH_DEBT):", re.IGNORECASE)
+
+    async def process(self, dump_file: DumpFile) -> None:
+        if not dump_file.temp_path or dump_file.error:
+            return
+
+        try:
+            content = await anyio.Path(dump_file.temp_path).read_text()
+            for i, line in enumerate(content.splitlines(), 1):
+                if self.todo_pattern.search(line):
+                    self.findings.append(
+                        {
+                            "file_path": dump_file.path,
+                            "line_number": i,
+                            "line": line.strip(),
+                        }
+                    )
+        except Exception as e:
+            logger.warning(
+                "Todo scan failed", path=dump_file.path, error=str(e)
+            )
+
+
 class SecretScanner:
     """Processor middleware to scan for and optionally redact secrets."""
 
-    def __init__(self, hide_secrets: bool = False):
+    def __init__(
+        self, hide_secrets: bool = False, custom_patterns: List[str] | None = None
+    ):
         self.hide_secrets = hide_secrets
-        # 🐞 FIX: Remove all plugin and config initialization.
-        # It is no longer needed for v1.5.0.
+        self.custom_patterns = [
+            re.compile(p) for p in custom_patterns
+        ] if custom_patterns else []
+
+    async def _scan_for_custom_secrets(
+        self, dump_file: DumpFile
+    ) -> List[PotentialSecret]:
+        """Scans for custom secret patterns."""
+        if not self.custom_patterns or not dump_file.temp_path:
+            return []
+
+        secrets = []
+        try:
+            content = await anyio.Path(dump_file.temp_path).read_text()
+            for i, line in enumerate(content.splitlines(), 1):
+                for pattern in self.custom_patterns:
+                    if pattern.search(line):
+                        secrets.append(
+                            PotentialSecret("Custom", dump_file.path, i, "Custom pattern")
+                        )
+        except Exception as e:
+            logger.warning(
+                "Custom secret scan failed", path=dump_file.path, error=str(e)
+            )
+        return secrets
 
     async def _scan_for_secrets(self, file_str_path: str) -> List[PotentialSecret]:
         """Runs detect-secrets in a thread pool with correct settings."""
@@ -101,10 +156,12 @@ class SecretScanner:
 
         temp_anyio_path = anyio.Path(dump_file.temp_path)
         temp_file_str = str(dump_file.temp_path)
-        
-        secrets = await self._scan_for_secrets(temp_file_str)
 
-        if secrets:
+        secrets = await self._scan_for_secrets(temp_file_str)
+        custom_secrets = await self._scan_for_custom_secrets(dump_file)
+        all_secrets = secrets + custom_secrets
+
+        if all_secrets:
             if self.hide_secrets:
                 # Redact the file and continue
                 await self._redact_secrets(temp_anyio_path, secrets)

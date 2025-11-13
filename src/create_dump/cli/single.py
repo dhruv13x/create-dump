@@ -48,6 +48,7 @@ def single(
     diff_since: Optional[str] = typer.Option(None, "--diff-since", help="Only dump files changed since a specific git ref (e.g., 'main')."),
     scan_secrets: bool = typer.Option(False, "--scan-secrets", help="Scan files for secrets. Fails dump if secrets are found."),
     hide_secrets: bool = typer.Option(False, "--hide-secrets", help="Redact found secrets (requires --scan-secrets)."),
+    scan_todos: bool = typer.Option(False, "--scan-todos", help="Scan files for TODOs/FIXMEs and append a summary."),
 
     # Archiving (Unified)
     archive: bool = typer.Option(False, "-a", "--archive", help="Archive prior dumps into ZIP (unified workflow)."),
@@ -66,6 +67,7 @@ def single(
     no_dry_run: bool = typer.Option(False, "-nd", "--no-dry-run", help="Run for real (disables simulation) [default: false]."),
     verbose: Optional[bool] = typer.Option(None, "-v", "--verbose", help="Enable debug logging."),
     quiet: Optional[bool] = typer.Option(None, "-q", "--quiet", help="Suppress output (CI mode)."),
+    notify_topic: Optional[str] = typer.Option(None, "--notify-topic", help="ntfy.sh topic for push notifications."),
 ):
     """Create a single code dump in the specified directory.
     ...
@@ -153,6 +155,8 @@ def single(
             diff_since,
             scan_secrets,
             hide_secrets,
+            scan_todos,
+            notify_topic,
         )
     except Exit as e:
         if getattr(e, "exit_code", None) == 0 and dry_run:

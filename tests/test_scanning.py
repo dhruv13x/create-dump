@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, MagicMock, patch, call, ANY
 import anyio
 
 # Import the class to test
-from create_dump.scanning import SecretScanner
+from create_dump.scanning import SecretScanner, TodoScanner
 # Import dependencies needed for testing
 from create_dump.core import DumpFile
 from detect_secrets.core.potential_secret import PotentialSecret
@@ -198,3 +198,51 @@ class TestSecretScanner:
         await scanner.process(dump_file)
         
         mock_scan.assert_not_called()
+
+    async def test_process_custom_secrets(
+        self, mocker, temp_dump_file, mock_scanner_internals
+    ):
+        """Test that the scanner finds custom secrets."""
+        dump_file, temp_path = temp_dump_file
+        mock_scanner_internals["scan_file"].return_value = []
+
+        scanner = SecretScanner(
+            hide_secrets=False, custom_patterns=[r"secret"]
+        )
+        await scanner.process(dump_file)
+
+        assert dump_file.error == "Secrets Detected"
+        assert dump_file.temp_path is None
+        assert await temp_path.exists() is False
+
+
+class TestTodoScanner:
+    """Groups tests for the TodoScanner middleware."""
+
+    async def test_finds_todos_and_fixmes(self, tmp_path):
+        """Test that the scanner finds TODOs and FIXMEs."""
+        scanner = TodoScanner()
+        content = "line 1\n# TODO: fix this\nline 3\n# FIXME: and this"
+        temp_file = tmp_path / "test.py"
+        await anyio.Path(temp_file).write_text(content)
+        dump_file = DumpFile(path="test.py", temp_path=temp_file)
+
+        await scanner.process(dump_file)
+
+        assert len(scanner.findings) == 2
+        assert scanner.findings[0]["line_number"] == 2
+        assert "TODO" in scanner.findings[0]["line"]
+        assert scanner.findings[1]["line_number"] == 4
+        assert "FIXME" in scanner.findings[1]["line"]
+
+    async def test_no_findings(self, tmp_path):
+        """Test that the scanner finds no TODOs or FIXMEs."""
+        scanner = TodoScanner()
+        content = "line 1\nline 2"
+        temp_file = tmp_path / "test.py"
+        await anyio.Path(temp_file).write_text(content)
+        dump_file = DumpFile(path="test.py", temp_path=temp_file)
+
+        await scanner.process(dump_file)
+
+        assert len(scanner.findings) == 0

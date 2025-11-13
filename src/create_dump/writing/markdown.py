@@ -37,16 +37,20 @@ class MarkdownWriter:
         self.version: str = VERSION
 
     async def write(
-        self, 
-        files: List[DumpFile], 
-        git_meta: Optional[GitMeta], 
-        version: str
+        self,
+        files: List[DumpFile],
+        git_meta: Optional[GitMeta],
+        version: str,
+        stats: Dict[str, Any],
+        todo_findings: List[Dict[str, Any]],
     ) -> None:
         """Writes the final Markdown file from the list of processed files."""
-        self.files = files  # Store for metrics
+        self.files = files
         self.git_meta = git_meta
         self.version = version
-        
+        self.stats = stats
+        self.todo_findings = todo_findings
+
         await self._write_md_streamed()
 
     async def _write_md_streamed(self) -> None:
@@ -62,6 +66,10 @@ class MarkdownWriter:
                 if self.git_meta:
                     await out.write(
                         f"**Git Branch:** {self.git_meta.branch} | **Commit:** {self.git_meta.commit}\n"
+                    )
+                if self.stats:
+                    await out.write(
+                        f"**Total Files:** {self.stats.get('total_files', 0)} | **Total Lines:** {self.stats.get('total_lines', 0)}\n"
                     )
                 await out.write("\n---\n\n")
 
@@ -111,6 +119,9 @@ class MarkdownWriter:
                         await out.write(temp_content)
                         await out.write(f"\n{fence}\n\n---\n\n")
 
+                if self.todo_findings:
+                    await self._write_todo_summary(out)
+
             await temp_out.rename(self.outfile)
             logger.info("MD written atomically", path=self.outfile)
         except Exception:
@@ -121,6 +132,18 @@ class MarkdownWriter:
             # NOTE: Final temp file cleanup is handled by the `temp_dir`
             # context manager in `single.py`.
             pass
+
+    async def _write_todo_summary(self, out_stream: anyio.abc.Stream) -> None:
+        """Writes the TODO summary section."""
+        await out_stream.write("## 📝 TODO Summary\n\n")
+        await out_stream.write(
+            "| File | Line | Content |\n| --- | --- | --- |\n"
+        )
+        for finding in self.todo_findings:
+            await out_stream.write(
+                f"| {finding['file_path']} | {finding['line_number']} | `{finding['line']}` |\n"
+            )
+        await out_stream.write("\n---\n\n")
 
     async def _render_tree_level(
         self,

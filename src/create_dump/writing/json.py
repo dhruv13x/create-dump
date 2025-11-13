@@ -26,19 +26,23 @@ class JsonWriter:
         self.files: List[DumpFile] = []  # Stored for metrics
 
     async def write(
-        self, 
-        files: List[DumpFile], 
-        git_meta: Optional[GitMeta], 
-        version: str
+        self,
+        files: List[DumpFile],
+        git_meta: Optional[GitMeta],
+        version: str,
+        stats: Dict[str, Any],
+        todo_findings: List[Dict[str, Any]],
     ) -> None:
         """Writes the final JSON file from the list of processed files."""
-        self.files = files  # Store for metrics
-        
+        self.files = files
+
         data: Dict[str, Any] = {
             "generated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "version": version,
             "git_meta": git_meta.model_dump() if git_meta else None,
-            "files": []
+            "stats": stats,
+            "todo_summary": todo_findings,
+            "files": [],
         }
 
         for df in self.files:

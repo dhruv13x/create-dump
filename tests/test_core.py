@@ -178,3 +178,27 @@ dest = "from_pyproject"
     config = load_config(path=explicit_path, _cwd=test_project.root)
 
     assert config.dest == Path("from_explicit_path")
+
+
+async def test_load_config_with_profile(test_project):
+    """
+    Tests that loading a profile correctly merges settings.
+    """
+    await test_project.create(
+        {
+            "pyproject.toml": """
+[tool.create-dump]
+dest = "from_pyproject"
+git_meta = false
+
+[tool.create-dump.profile.test]
+dest = "from_profile"
+scan_secrets = true
+"""
+        }
+    )
+
+    config = load_config(_cwd=test_project.root, profile="test")
+    assert config.dest == Path("from_profile")
+    assert config.git_meta is False
+    assert config.scan_secrets is True

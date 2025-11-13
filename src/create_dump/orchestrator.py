@@ -21,10 +21,9 @@ from .cleanup import safe_delete_paths
 from .core import Config, load_config, DEFAULT_DUMP_PATTERN
 # ⚡ FIX: Import the renamed async functions
 from .path_utils import confirm, find_matching_files, safe_is_within
-# ⚡ FIX: Import the renamed async function
-from .single import run_single
 from .logging import logger, styled_print
 from .metrics import DUMP_DURATION, ROLLBACKS_TOTAL
+from create_dump.workflow.single import SingleRunOrchestrator
 
 # ⚡ FIX: Renamed __all__
 __all__ = ["run_batch"]
@@ -172,6 +171,7 @@ async def run_batch(
     yes: bool,
     accept_prompts: bool,
     compress: bool,
+    format: str,
     max_workers: int,
     verbose: bool,
     quiet: bool,
@@ -184,7 +184,6 @@ async def run_batch(
     archive_keep_latest: bool = True,
     archive_keep_last: Optional[int] = None,
     archive_clean_root: bool = False,
-    atomic: bool = True,
 ) -> None:
     root = root.resolve()
     cfg = load_config()
@@ -192,8 +191,6 @@ async def run_batch(
     if not re.match(r'.*_all_create_dump_', pattern):
         logger.warning("Enforcing canonical pattern: %s", cfg.dump_pattern)
         pattern = cfg.dump_pattern
-
-    atomic = not dry_run and atomic
 
     # Common: Resolve sub_roots & pre-cleanup
     sub_roots = []
@@ -220,17 +217,39 @@ async def run_batch(
 
     async def _run_single_wrapper(sub_root: Path):
         try:
-            # ⚡ FIX: Call renamed async function
-            await run_single(
-                root=sub_root, dry_run=dry_run, yes=accept_prompts or yes, no_toc=False,
-                compress=compress, exclude="", include="", max_file_size=cfg.max_file_size_kb,
-                use_gitignore=cfg.use_gitignore, git_meta=cfg.git_meta, progress=False,
-                max_workers=16, archive=False, archive_all=False, archive_search=False,
-                archive_include_current=archive_include_current, archive_no_remove=archive_no_remove,
-                archive_keep_latest=archive_keep_latest, archive_keep_last=archive_keep_last,
-                archive_clean_root=archive_clean_root, allow_empty=True, metrics_port=0,
-                verbose=verbose, quiet=quiet,
+            # Per-project config discovery
+            project_cfg = load_config(_cwd=sub_root)
+
+            orchestrator = SingleRunOrchestrator(
+                root=sub_root,
+                dry_run=dry_run,
+                yes=accept_prompts or yes,
+                no_toc=False,
+                tree_toc=False,
+                compress=compress,
+                format=format,
+                exclude="",
+                include="",
+                max_file_size=project_cfg.max_file_size_kb,
+                use_gitignore=project_cfg.use_gitignore,
+                git_meta=project_cfg.git_meta,
+                progress=False,
+                max_workers=16,
+                archive=False,
+                archive_all=False,
+                archive_search=False,
+                archive_include_current=archive_include_current,
+                archive_no_remove=archive_no_remove,
+                archive_keep_latest=archive_keep_latest,
+                archive_keep_last=archive_keep_last,
+                archive_clean_root=archive_clean_root,
+                allow_empty=True,
+                metrics_port=0,
+                verbose=verbose,
+                quiet=quiet,
+                # Pass other necessary fields from project_cfg
             )
+            await orchestrator.run()
             successes.append(sub_root)
             if not quiet:
                 styled_print(f"[green]✅ Dumped {sub_root}[/green]")
@@ -255,59 +274,29 @@ async def run_batch(
         return
 
     run_id = uuid.uuid4().hex[:8]
-    if atomic:
-        async with atomic_batch_txn(root, dest, run_id, dry_run) as staging:
-            if staging is None:
-                return  # Dry run complete
+    async with atomic_batch_txn(root, dest, run_id, dry_run) as staging:
+        if staging is None:
+            return  # Dry run complete
 
-            await _centralize_outputs(staging, root, successes, compress, yes, pattern)
-            
-            if not await validate_batch_staging(staging, pattern):
-                # Raise validation error *before* archiving
-                raise ValueError("Validation failed: Incomplete dumps")
-
-            if archive or archive_all:
-                timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
-                staging_path = Path(staging)
-                manager = ArchiveManager(
-                    root=staging_path,
-                    timestamp=timestamp, keep_latest=archive_keep_latest, keep_last=archive_keep_last,
-                    clean_root=archive_clean_root, search=archive_search,
-                    include_current=archive_include_current, no_remove=archive_no_remove,
-                    dry_run=dry_run, yes=yes, verbose=verbose, md_pattern=pattern, archive_all=archive_all,
-                )
-                archive_results = await manager.run()
-                if verbose:
-                    logger.debug("Archiving in staging: search=%s, all=%s", archive_search, archive_all)
-                if archive_results and any(archive_results.values()):
-                    groups = ', '.join(k for k, v in archive_results.items() if v)
-                    logger.info("Archived: %s", groups)
-                    if not quiet:
-                        styled_print(f"[green]📦 Archived: {groups}[/green]")
-                else:
-                    logger.info("No dumps for archiving.")
-            
-    else: # Not atomic
-        if dry_run:
-            logger.info("[dry-run] Would centralize files to non-atomic dest.")
-            return
-
-        central_dest = dest or root / "archives"
-        await _centralize_outputs(central_dest, root, successes, compress, yes, pattern)
+        await _centralize_outputs(staging, root, successes, compress, yes, pattern)
         
-        if not await validate_batch_staging(anyio.Path(central_dest), pattern):
-            logger.warning("Validation failed: Incomplete dumps in non-atomic destination.")
-            # Do not raise, as this is non-transactional
+        if not await validate_batch_staging(staging, pattern):
+            # Raise validation error *before* archiving
+            raise ValueError("Validation failed: Incomplete dumps")
 
         if archive or archive_all:
             timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
+            staging_path = Path(staging)
             manager = ArchiveManager(
-                root=root, timestamp=timestamp, keep_latest=archive_keep_latest, keep_last=archive_keep_last,
-                clean_root=archive_clean_root, search=archive_search, include_current=archive_include_current,
-                no_remove=archive_no_remove, dry_run=dry_run, yes=yes, verbose=verbose,
-                md_pattern=pattern, archive_all=archive_all,
+                root=staging_path,
+                timestamp=timestamp, keep_latest=archive_keep_latest, keep_last=archive_keep_last,
+                clean_root=archive_clean_root, search=archive_search,
+                include_current=archive_include_current, no_remove=archive_no_remove,
+                dry_run=dry_run, yes=yes, verbose=verbose, md_pattern=pattern, archive_all=archive_all,
             )
             archive_results = await manager.run()
+            if verbose:
+                logger.debug("Archiving in staging: search=%s, all=%s", archive_search, archive_all)
             if archive_results and any(archive_results.values()):
                 groups = ', '.join(k for k, v in archive_results.items() if v)
                 logger.info("Archived: %s", groups)

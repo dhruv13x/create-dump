@@ -82,7 +82,7 @@ async def test_write_standard_list_toc(
     writer = MarkdownWriter(outfile, no_toc=False, tree_toc=False)
     
     # 2. Act
-    await writer.write(files, mock_git_meta, "8.0.0")
+    await writer.write(files, mock_git_meta, "8.0.0", {}, [])
 
     # 3. Assert
     assert await anyio.Path(outfile).exists()
@@ -148,7 +148,7 @@ async def test_write_tree_toc(test_project, temp_dumpfile_factory):
     writer = MarkdownWriter(outfile, no_toc=False, tree_toc=True)
     
     # 2. Act
-    await writer.write(files, None, "8.0.0")
+    await writer.write(files, None, "8.0.0", {}, [])
     
     # 3. Assert
     content = await anyio.Path(outfile).read_text()
@@ -188,7 +188,7 @@ async def test_write_no_toc(test_project, temp_dumpfile_factory):
     writer = MarkdownWriter(outfile, no_toc=True, tree_toc=False)
     
     # 2. Act
-    await writer.write(files, None, "8.0.0")
+    await writer.write(files, None, "8.0.0", {}, [])
     
     # 3. Assert
     content = await anyio.Path(outfile).read_text()

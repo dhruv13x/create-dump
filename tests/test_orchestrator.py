@@ -760,3 +760,38 @@ class TestRunBatch:
         
         # Assert the rest of the run continued
         assert mock_run_single.call_count == len(multi_subdirs)
+
+    async def test_per_project_config_discovery(
+        self, test_project, mocker, mock_config, mock_find_files_gen
+    ):
+        """Test that per-project config is loaded."""
+        root = test_project.root
+        sub1 = root / "sub1"
+        sub1.mkdir()
+        (sub1 / "pyproject.toml").write_text(
+            '[tool.create-dump]\nmax_file_size_kb = 1234'
+        )
+
+        mock_run_single = mocker.patch(
+            "create_dump.orchestrator.SingleRunOrchestrator", new_callable=AsyncMock
+        )
+
+        await run_batch(
+            root=root,
+            subdirs=["sub1"],
+            pattern=mock_config.dump_pattern,
+            dry_run=False,
+            yes=True,
+            accept_prompts=True,
+            compress=False,
+            max_workers=1,
+            verbose=False,
+            quiet=True,
+            dest=None,
+            archive=False,
+            atomic=True,
+        )
+
+        mock_run_single.assert_called_once()
+        args, kwargs = mock_run_single.call_args
+        assert kwargs["max_file_size"] == 1234
