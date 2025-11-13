@@ -1,3 +1,5 @@
+![logo](logo.png)
+
 # create-dump
 
 ![PyPI](https://badge.fury.io/py/create-dump.svg)
