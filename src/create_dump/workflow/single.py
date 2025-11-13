@@ -28,7 +28,9 @@ from ..system import get_git_meta
 from ..processor import FileProcessor, ProcessorMiddleware
 from ..writing import ChecksumWriter, MarkdownWriter, JsonWriter
 from ..version import VERSION
-from ..scanning import SecretScanner
+from ..scanning.secret import SecretScanner
+from ..scanning.todo import TodoScanner
+from ..notifications import send_ntfy_notification
 
 
 class SingleRunOrchestrator:
@@ -68,6 +70,8 @@ class SingleRunOrchestrator:
         diff_since: Optional[str] = None,
         scan_secrets: bool = False,
         hide_secrets: bool = False,
+        scan_todos: bool = False,
+        notify_topic: Optional[str] = None,
     ):
         # Store all parameters as instance attributes
         self.root = root
@@ -102,10 +106,23 @@ class SingleRunOrchestrator:
         self.diff_since = diff_since
         self.scan_secrets = scan_secrets
         self.hide_secrets = hide_secrets
+        self.scan_todos = scan_todos
+        self.notify_topic = notify_topic
         
         # ⚡ REFACTOR: Store anyio.Path version of root
         self.anyio_root = anyio.Path(self.root)
 
+    def _get_stats_sync(self, files: List[str]) -> tuple[int, int]:
+        """Calculates total files and lines of code."""
+        total_files = len(files)
+        total_loc = 0
+        for f in files:
+            try:
+                with open(self.root / f, "r", encoding="utf-8", errors="ignore") as in_f:
+                    total_loc += sum(1 for _ in in_f)
+            except (IOError, FileNotFoundError):
+                pass  # File might have vanished, skip
+        return total_files, total_loc
     
     # ⚡ FIX: Removed 'async' keyword. This must be a sync function.
     def _get_total_size_sync(self, files: List[str]) -> int:
@@ -126,92 +143,93 @@ class SingleRunOrchestrator:
 
     async def run(self):
         """The core logic for a single dump run."""
-        
-        # Load config on each run, in case it changed
-        cfg = load_config()
-        if self.max_file_size is not None:
-            cfg.max_file_size_kb = self.max_file_size
-
-        # Apply config defaults for new flags
-        # CLI flags take precedence (if True), otherwise use config file
-        
-        effective_git_ls_files = self.git_ls_files or cfg.git_ls_files
-        effective_scan_secrets = self.scan_secrets or cfg.scan_secrets
-        effective_hide_secrets = self.hide_secrets or cfg.hide_secrets
-
-        includes = [p.strip() for p in self.include.split(",") if p.strip()]
-        excludes = [p.strip() for p in self.exclude.split(",") if p.strip()]
-
-        # ⚡ FIX: Use the 'get_collector' factory function
-        collector = get_collector(
-            config=cfg, 
-            includes=includes, 
-            excludes=excludes, 
-            use_gitignore=self.use_gitignore, 
-            root=self.root,
-            git_ls_files=effective_git_ls_files,
-            diff_since=self.diff_since, # diff_since is CLI-only, not in config
-        )
-        files_list = await collector.collect()
-
-        if not files_list:
-            msg = "⚠️ No matching files found; skipping dump."
-            logger.warning(msg)
-            if self.verbose:
-                logger.debug("Excludes: %s, Includes: %s", excludes, includes)
-            if not self.quiet:
-                styled_print(f"[yellow]{msg}[/yellow]")
-            if not self.allow_empty:
-                raise Exit(code=1)
-            return
-
-        # ⚡ FIX: This call is now correct, as it's passing a sync func
-        total_size = await anyio.to_thread.run_sync(self._get_total_size_sync, files_list)
-
-        logger.info(
-            "Collection complete",
-            count=len(files_list),
-            total_size_kb=total_size / 1024,
-            root=str(self.root),
-        )
-        if not self.quiet:
-            styled_print(
-                f"[green]📄 Found {len(files_list)} files ({total_size / 1024:.1f} KB total).[/green]"
-            )
-
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-        foldername = self.root.name or "project"
-        
-        file_ext = "json" if self.format == "json" else "md"
-        branded_name = Path(f"{foldername}_all_create_dump_{timestamp}.{file_ext}")
-        
-        output_dest = self.root
-        if self.dest:
-            output_dest = self.dest.resolve()
-            if not output_dest.is_absolute():
-                output_dest = self.root / self.dest
-            
-            # ⚡ REFACTOR: (Target 1) Use await and async check
-            anyio_output_dest = anyio.Path(output_dest)
-            if not await safe_is_within(anyio_output_dest, self.anyio_root):
-                logger.warning("Absolute dest outside root; proceeding with caution.")
-            await anyio_output_dest.mkdir(parents=True, exist_ok=True)
-        
-        base_outfile = output_dest / branded_name
-        
-        prompt_outfile = await anyio.to_thread.run_sync(_unique_path, base_outfile)
-
-        if not self.yes and not self.dry_run and not self.quiet:
-            styled_print(
-                f"Proceed with dump to [blue]{prompt_outfile}[/blue]? [yellow](y/n)[/yellow]",
-                nl=False,
-            )
-            user_input = await anyio.to_thread.run_sync(input, "")
-            if not user_input.lower().startswith("y"):
-                styled_print("[red]Cancelled.[/red]")
-                raise Exit(code=1)
-
+        status_title = "✅ create-dump Success"
+        status_message = "Dump completed."
         try:
+            # Load config on each run, in case it changed
+            cfg = load_config()
+            if self.max_file_size is not None:
+                cfg.max_file_size_kb = self.max_file_size
+
+            # Apply config defaults for new flags
+            # CLI flags take precedence (if True), otherwise use config file
+
+            effective_git_ls_files = self.git_ls_files or cfg.git_ls_files
+            effective_scan_secrets = self.scan_secrets or cfg.scan_secrets
+            effective_hide_secrets = self.hide_secrets or cfg.hide_secrets
+
+            includes = [p.strip() for p in self.include.split(",") if p.strip()]
+            excludes = [p.strip() for p in self.exclude.split(",") if p.strip()]
+
+            # ⚡ FIX: Use the 'get_collector' factory function
+            collector = get_collector(
+                config=cfg,
+                includes=includes,
+                excludes=excludes,
+                use_gitignore=self.use_gitignore,
+                root=self.root,
+                git_ls_files=effective_git_ls_files,
+                diff_since=self.diff_since, # diff_since is CLI-only, not in config
+            )
+            files_list = await collector.collect()
+
+            if not files_list:
+                msg = "⚠️ No matching files found; skipping dump."
+                logger.warning(msg)
+                if self.verbose:
+                    logger.debug("Excludes: %s, Includes: %s", excludes, includes)
+                if not self.quiet:
+                    styled_print(f"[yellow]{msg}[/yellow]")
+                if not self.allow_empty:
+                    raise Exit(code=1)
+                return
+
+            total_files, total_loc = await anyio.to_thread.run_sync(self._get_stats_sync, files_list)
+            total_size = await anyio.to_thread.run_sync(self._get_total_size_sync, files_list)
+
+            logger.info(
+                "Collection complete",
+                count=len(files_list),
+                total_size_kb=total_size / 1024,
+                root=str(self.root),
+            )
+            if not self.quiet:
+                styled_print(
+                    f"[green]📄 Found {total_files} files ({total_loc} lines, {total_size / 1024:.1f} KB total).[/green]"
+                )
+
+            timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+            foldername = self.root.name or "project"
+            
+            file_ext = "json" if self.format == "json" else "md"
+            branded_name = Path(f"{foldername}_all_create_dump_{timestamp}.{file_ext}")
+
+            output_dest = self.root
+            if self.dest:
+                output_dest = self.dest.resolve()
+                if not output_dest.is_absolute():
+                    output_dest = self.root / self.dest
+
+                # ⚡ REFACTOR: (Target 1) Use await and async check
+                anyio_output_dest = anyio.Path(output_dest)
+                if not await safe_is_within(anyio_output_dest, self.anyio_root):
+                    logger.warning("Absolute dest outside root; proceeding with caution.")
+                await anyio_output_dest.mkdir(parents=True, exist_ok=True)
+
+            base_outfile = output_dest / branded_name
+
+            prompt_outfile = await anyio.to_thread.run_sync(_unique_path, base_outfile)
+
+            if not self.yes and not self.dry_run and not self.quiet:
+                styled_print(
+                    f"Proceed with dump to [blue]{prompt_outfile}[/blue]? [yellow](y/n)[/yellow]",
+                    nl=False,
+                )
+                user_input = await anyio.to_thread.run_sync(input, "")
+                if not user_input.lower().startswith("y"):
+                    styled_print("[red]Cancelled.[/red]")
+                    raise Exit(code=1)
+
             if self.dry_run:
                 styled_print("[green]✅ Dry run: Would process listed files.[/green]")
                 if not self.quiet:
@@ -243,8 +261,13 @@ class SingleRunOrchestrator:
                         middlewares: List[ProcessorMiddleware] = []
                         if effective_scan_secrets:
                             middlewares.append(
-                                SecretScanner(hide_secrets=effective_hide_secrets)
+                                SecretScanner(
+                                    hide_secrets=effective_hide_secrets,
+                                    custom_patterns=cfg.custom_secret_patterns,
+                                )
                             )
+                        if self.scan_todos:
+                            middlewares.append(TodoScanner())
                         
                         # ⚡ REFACTOR: Step 2 - Process files
                         processor = FileProcessor(
@@ -258,14 +281,14 @@ class SingleRunOrchestrator:
                         # Step 3 - Format output
                         if self.format == "json":
                             writer = JsonWriter(outfile)
-                            await writer.write(processed_files, gmeta, VERSION)
+                            await writer.write(processed_files, gmeta, VERSION, total_files=total_files, total_loc=total_loc)
                         else:
                             writer = MarkdownWriter(
                                 outfile, 
                                 self.no_toc, 
                                 self.tree_toc,
                             )
-                            await writer.write(processed_files, gmeta, VERSION)
+                            await writer.write(processed_files, gmeta, VERSION, total_files=total_files, total_loc=total_loc)
 
                 # Step 4 - Compress
                 if self.compress:
@@ -320,9 +343,25 @@ class SingleRunOrchestrator:
                     errors=len(processed_files) - success_count,
                     output=str(outfile),
                 )
+                status_message = f"Successfully created: {outfile.name}"
             finally:
                 await anyio.to_thread.run_sync(temp_dir.cleanup)
-
         except Exit as e:
-            # Re-raise to be handled by the caller
-            raise
+            if e.exit_code == 0:
+                status_title = "ℹ️ create-dump Dry Run"
+                status_message = "Dry run completed."
+            else:
+                status_title = "❌ create-dump Failed"
+                status_message = f"Failed with exit code {e.exit_code}"
+            raise e
+        except Exception as e:
+            status_title = "❌ create-dump Error"
+            status_message = f"An unexpected error occurred: {str(e)}"
+            raise e
+        finally:
+            if self.notify_topic:
+                await send_ntfy_notification(
+                    self.notify_topic,
+                    message=status_message,
+                    title=status_title,
+                )

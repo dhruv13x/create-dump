@@ -87,7 +87,7 @@ async def test_json_writer(
     writer = JsonWriter(outfile)
     
     # 2. Act
-    await writer.write(files_to_process, mock_git_meta, "8.0.0")
+    await writer.write(files_to_process, mock_git_meta, "8.0.0", total_files=2, total_loc=2)
 
     # 3. Assert
     
@@ -106,6 +106,8 @@ async def test_json_writer(
     assert data["git_meta"]["commit"] == "abc1234"
     assert "generated" in data
     assert len(data["files"]) == 2
+    assert data["total_files"] == 2
+    assert data["total_lines_of_code"] == 2
     
     # Check successful file entry
     file1 = data["files"][0]
@@ -151,7 +153,7 @@ async def test_json_writer_read_temp_file_error(
     mock_logger_error = mocker.patch("create_dump.writing.json.logger.error")
     
     # 3. Act
-    await writer.write([failing_dumpfile], mock_git_meta, "8.0.0")
+    await writer.write([failing_dumpfile], mock_git_meta, "8.0.0", total_files=1, total_loc=1)
 
     # 4. Assert
     output_path = anyio.Path(outfile)
@@ -232,7 +234,7 @@ async def test_json_writer_atomic_write_failure(
 
     # 3. Act & Assert
     with pytest.raises(OSError, match="Rename failed!"):
-        await writer.write(files_to_process, mock_git_meta, "8.0.0")
+        await writer.write(files_to_process, mock_git_meta, "8.0.0", total_files=1, total_loc=1)
         
     # 4. Assert cleanup
     mock_temp_out.rename.assert_called_once_with(outfile)
@@ -241,3 +243,32 @@ async def test_json_writer_atomic_write_failure(
     
     # ⚡ FIX: This assertion will now use the original anyio.Path and pass
     assert not await anyio.Path(outfile).exists()
+
+
+async def test_json_writer_includes_todos(
+    test_project, temp_dumpfile_factory
+):
+    """
+    Tests that the JsonWriter correctly includes the 'todos' field.
+    """
+    # 1. Setup
+    outfile = test_project.path("dump_todos.json")
+
+    files_to_process = [
+        await temp_dumpfile_factory(
+            file_path="src/main.py",
+            content="pass",
+        ),
+    ]
+    files_to_process[0].todos = ["src/main.py (Line 1): TODO: Implement this"]
+
+    writer = JsonWriter(outfile)
+
+    # 2. Act
+    await writer.write(files_to_process, None, "9.0.0", total_files=1, total_loc=1)
+
+    # 3. Assert
+    data = json.loads(await anyio.Path(outfile).read_text())
+
+    assert "todos" in data["files"][0]
+    assert data["files"][0]["todos"] == ["src/main.py (Line 1): TODO: Implement this"]

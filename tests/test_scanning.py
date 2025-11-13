@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, MagicMock, patch, call, ANY
 import anyio
 
 # Import the class to test
-from create_dump.scanning import SecretScanner
+from create_dump.scanning.secret import SecretScanner
 # Import dependencies needed for testing
 from create_dump.core import DumpFile
 from detect_secrets.core.potential_secret import PotentialSecret
@@ -73,7 +73,7 @@ def mock_scanner_internals(mocker, mock_potential_secret):
     """
     # 1. Mock the function that runs in the thread
     mock_scan_file_func = mocker.patch(
-        "create_dump.scanning.scan.scan_file", # Patched where it's called
+        "create_dump.scanning.secret.scan.scan_file", # Patched where it's called
         # 🐞 FIX: Return a list (or generator) instead of a dict
         return_value=[mock_potential_secret]
     )
@@ -81,7 +81,7 @@ def mock_scanner_internals(mocker, mock_potential_secret):
     # 2. Mock the logger to verify it's being silenced
     mock_ds_logger = MagicMock()
     mock_get_logger = mocker.patch(
-        "create_dump.scanning.logging.getLogger",
+        "create_dump.scanning.secret.logging.getLogger",
         return_value=mock_ds_logger
     )
 
@@ -177,7 +177,7 @@ class TestSecretScanner:
 
         # 🐞 FIX: Patch the new, isolated `_run_sync` symbol
         mocker.patch(
-            "create_dump.scanning._run_sync",
+            "create_dump.scanning.secret._run_sync",
             side_effect=Exception("Simulated API Error")
         )
 
@@ -192,9 +192,41 @@ class TestSecretScanner:
         Test Case 5: process() returns early if dump_file has no temp_path.
         """
         dump_file = DumpFile(path="src/file.py", temp_path=None, error="Read error")
-        mock_scan = mocker.patch("create_dump.scanning.scan.scan_file")
+        mock_scan = mocker.patch("create_dump.scanning.secret.scan.scan_file")
         
         scanner = SecretScanner()
         await scanner.process(dump_file)
         
         mock_scan.assert_not_called()
+
+
+    async def test_process_with_custom_patterns_no_hide(
+        self, temp_dump_file
+    ):
+        """
+        Tests that custom patterns are detected and fail the dump.
+        """
+        dump_file, _ = temp_dump_file
+        scanner = SecretScanner(
+            hide_secrets=False,
+            custom_patterns=["secret"]
+        )
+        await scanner.process(dump_file)
+        assert dump_file.error == "Secrets Detected"
+
+
+    async def test_process_with_custom_patterns_with_hide(
+        self, temp_dump_file
+    ):
+        """
+        Tests that custom patterns are detected and redacted.
+        """
+        dump_file, temp_path = temp_dump_file
+        scanner = SecretScanner(
+            hide_secrets=True,
+            custom_patterns=["secret"]
+        )
+        await scanner.process(dump_file)
+        assert dump_file.error is None
+        new_content = await temp_path.read_text()
+        assert "***SECRET_REDACTED***" in new_content

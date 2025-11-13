@@ -82,7 +82,7 @@ async def test_write_standard_list_toc(
     writer = MarkdownWriter(outfile, no_toc=False, tree_toc=False)
     
     # 2. Act
-    await writer.write(files, mock_git_meta, "8.0.0")
+    await writer.write(files, mock_git_meta, "8.0.0", total_files=3, total_loc=100)
 
     # 3. Assert
     assert await anyio.Path(outfile).exists()
@@ -93,6 +93,8 @@ async def test_write_standard_list_toc(
     # Check Header
     assert "**Version:** 8.0.0" in content
     assert "**Git Branch:** main | **Commit:** abc1234" in content
+    assert "**Total Files:** 3" in content
+    assert "**Total Lines:** 100" in content
     
     # Check ToC (List format)
     assert "## Table of Contents" in content
@@ -148,7 +150,7 @@ async def test_write_tree_toc(test_project, temp_dumpfile_factory):
     writer = MarkdownWriter(outfile, no_toc=False, tree_toc=True)
     
     # 2. Act
-    await writer.write(files, None, "8.0.0")
+    await writer.write(files, None, "8.0.0", total_files=2, total_loc=2)
     
     # 3. Assert
     content = await anyio.Path(outfile).read_text()
@@ -188,7 +190,7 @@ async def test_write_no_toc(test_project, temp_dumpfile_factory):
     writer = MarkdownWriter(outfile, no_toc=True, tree_toc=False)
     
     # 2. Act
-    await writer.write(files, None, "8.0.0")
+    await writer.write(files, None, "8.0.0", total_files=1, total_loc=1)
     
     # 3. Assert
     content = await anyio.Path(outfile).read_text()
@@ -204,3 +206,29 @@ async def test_write_no_toc(test_project, temp_dumpfile_factory):
     assert "**Version:** 8.0.0" in content
     assert "## src/main.py" in content
     assert "```python\npass\n```" in content
+
+
+async def test_write_with_todo_summary(test_project, temp_dumpfile_factory):
+    """
+    Test Case: Write with a TODO summary.
+    Checks that the ## 📝 Technical Debt Summary section is correctly rendered.
+    """
+    # 1. Setup
+    outfile = test_project.path("dump_with_todos.md")
+
+    files = [
+        await temp_dumpfile_factory("src/main.py", "pass"),
+    ]
+    files[0].todos = ["src/main.py (Line 1): TODO: Implement this"]
+
+    writer = MarkdownWriter(outfile, no_toc=False, tree_toc=False)
+
+    # 2. Act
+    await writer.write(files, None, "9.0.0", total_files=1, total_loc=1)
+
+    # 3. Assert
+    content = await anyio.Path(outfile).read_text()
+
+    assert "## 📝 Technical Debt Summary" in content
+    assert "Found 1 items:" in content
+    assert "- src/main.py (Line 1): TODO: Implement this" in content

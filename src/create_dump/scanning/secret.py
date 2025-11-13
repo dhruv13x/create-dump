@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import List, Dict, Any
 
 import anyio
@@ -13,9 +14,9 @@ from anyio import to_thread
 from detect_secrets.core import scan
 from detect_secrets.core.potential_secret import PotentialSecret
 
-from .core import DumpFile
-from .logging import logger
-from .metrics import ERRORS_TOTAL
+from ..core import DumpFile
+from ..logging import logger
+from ..metrics import ERRORS_TOTAL
 
 # 🐞 FIX: Create a private, patchable symbol for run_sync
 _run_sync = to_thread.run_sync
@@ -24,10 +25,9 @@ _run_sync = to_thread.run_sync
 class SecretScanner:
     """Processor middleware to scan for and optionally redact secrets."""
 
-    def __init__(self, hide_secrets: bool = False):
+    def __init__(self, hide_secrets: bool = False, custom_patterns: List[str] | None = None):
         self.hide_secrets = hide_secrets
-        # 🐞 FIX: Remove all plugin and config initialization.
-        # It is no longer needed for v1.5.0.
+        self.compiled_patterns = [re.compile(p) for p in (custom_patterns or [])]
 
     async def _scan_for_secrets(self, file_str_path: str) -> List[PotentialSecret]:
         """Runs detect-secrets in a thread pool with correct settings."""
@@ -90,6 +90,34 @@ class SecretScanner:
             # If redaction fails, write a generic error to be safe
             await temp_path.write_text(f"*** ERROR: SECRET REDACTION FAILED ***\n{e}")
 
+    async def _scan_for_custom_secrets(self, temp_path: anyio.Path) -> List[PotentialSecret]:
+        """Scans a file for user-defined regex patterns."""
+        if not self.compiled_patterns:
+            return []
+
+        custom_secrets = []
+        try:
+            content = await temp_path.read_text()
+            lines = content.splitlines()
+            for i, line in enumerate(lines, 1):
+                for pattern in self.compiled_patterns:
+                    match = pattern.search(line)
+                    if match:
+                        # Create a PotentialSecret for consistency
+                        secret = PotentialSecret(
+                            type=f"Custom: {pattern.pattern[:50]}...",
+                            filename=str(temp_path),
+                            line_number=i,
+                            secret=match.group(0),
+                        )
+                        custom_secrets.append(secret)
+                        # Go to next line once one pattern matches
+                        break
+        except Exception as e:
+            logger.error("Custom secret scan failed", path=str(temp_path), error=str(e))
+
+        return custom_secrets
+
     async def process(self, dump_file: DumpFile) -> None:
         """
         Public method to run the scan/redact logic on a processed file.
@@ -103,11 +131,13 @@ class SecretScanner:
         temp_file_str = str(dump_file.temp_path)
         
         secrets = await self._scan_for_secrets(temp_file_str)
+        custom_secrets = await self._scan_for_custom_secrets(temp_anyio_path)
+        all_secrets = secrets + custom_secrets
 
-        if secrets:
+        if all_secrets:
             if self.hide_secrets:
                 # Redact the file and continue
-                await self._redact_secrets(temp_anyio_path, secrets)
+                await self._redact_secrets(temp_anyio_path, all_secrets)
                 logger.warning("Redacted secrets", path=dump_file.path)
             else:
                 # Fail the file
