@@ -99,14 +99,14 @@ testpaths = ["tests"]
 addopts = [
   "-ra",
   "--strict-config",
-  "--strict-markers"
+  "--strict-markers",
+  "--cov",
+  "--cov-report=term-missing",
+  "--cov-report=html",
+  "--cov-report=term-missing:skip-covered",
 ]
-
-# uncomment and add when local use
-#  "--cov",
-#  "--cov-report=term-missing",
-#  "--cov-report=html",
-#  "--cov-report=term-missing:skip-covered"
+log_cli = true
+log_cli_level = "INFO"
 
 [tool.create-dump]
 use_gitignore = true
