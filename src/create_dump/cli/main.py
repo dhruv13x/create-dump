@@ -103,6 +103,7 @@ def main_callback(
         is_eager=True,  # Handle this before any command
     ),
     config: Optional[str] = typer.Option(None, "--config", help="Path to TOML config file."),
+    profile: Optional[str] = typer.Option(None, "--profile", help="Configuration profile to use."),
     
     # --- ⚡ REFACTOR: Grouped SRE/Control Flags ---
     yes: bool = typer.Option(False, "-y", "--yes", help="Assume yes for prompts and deletions [default: false]."),
@@ -131,6 +132,7 @@ def main_callback(
     diff_since: Optional[str] = typer.Option(None, "--diff-since", help="Only dump files changed since a specific git ref (e.g., 'main')."),
     scan_secrets: bool = typer.Option(False, "--scan-secrets", help="Scan files for secrets. Fails dump if secrets are found."),
     hide_secrets: bool = typer.Option(False, "--hide-secrets", help="Redact found secrets (requires --scan-secrets)."),
+    scan_todos: bool = typer.Option(False, "--scan-todos", help="Scan files for TODOs/FIXMEs and append a summary."),
     archive: bool = typer.Option(False, "-a", "--archive", help="Archive prior dumps into ZIP (unified workflow)."),
     archive_all: bool = typer.Option(False, "--archive-all", help="Archive dumps grouped by prefix (e.g., src_, tests_) into separate ZIPs."),
     archive_search: bool = typer.Option(False, "--archive-search", help="Search project-wide for dumps."),
@@ -140,6 +142,7 @@ def main_callback(
     archive_keep_last: Optional[int] = typer.Option(None, "--archive-keep-last", help="Keep last N archives."),
     archive_clean_root: bool = typer.Option(False, "--archive-clean-root", help="Clean root post-archive."),
     archive_format: str = typer.Option("zip", "--archive-format", help="Archive format (zip, tar.gz, tar.bz2)."),
+    notify_topic: Optional[str] = typer.Option(None, "--notify-topic", help="ntfy.sh topic for push notifications."),
 ):
     """Create Markdown code dumps from source files.
 
@@ -169,7 +172,7 @@ def main_callback(
         
         raise typer.Exit(code=0)  # Exit after creating file
 
-    load_config(Path(config) if config else None)
+    load_config(Path(config) if config else None, profile=profile)
     
     if ctx.invoked_subcommand is None:
         root_arg = ctx.args[0] if ctx.args else Path(".")
@@ -198,6 +201,7 @@ def main_callback(
             diff_since=diff_since,
             scan_secrets=scan_secrets,
             hide_secrets=hide_secrets,
+            scan_todos=scan_todos,
             archive=archive,
             archive_all=archive_all,
             archive_search=archive_search,
@@ -211,7 +215,8 @@ def main_callback(
             dry_run=dry_run,
             no_dry_run=no_dry_run,
             verbose=verbose,
-            quiet=quiet
+            quiet=quiet,
+            notify_topic=notify_topic,
         )
 
 

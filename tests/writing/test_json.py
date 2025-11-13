@@ -87,7 +87,9 @@ async def test_json_writer(
     writer = JsonWriter(outfile)
     
     # 2. Act
-    await writer.write(files_to_process, mock_git_meta, "8.0.0")
+    await writer.write(
+        files_to_process, mock_git_meta, "8.0.0", {}, []
+    )
 
     # 3. Assert
     
@@ -151,7 +153,7 @@ async def test_json_writer_read_temp_file_error(
     mock_logger_error = mocker.patch("create_dump.writing.json.logger.error")
     
     # 3. Act
-    await writer.write([failing_dumpfile], mock_git_meta, "8.0.0")
+    await writer.write([failing_dumpfile], mock_git_meta, "8.0.0", {}, [])
 
     # 4. Assert
     output_path = anyio.Path(outfile)
@@ -232,7 +234,7 @@ async def test_json_writer_atomic_write_failure(
 
     # 3. Act & Assert
     with pytest.raises(OSError, match="Rename failed!"):
-        await writer.write(files_to_process, mock_git_meta, "8.0.0")
+        await writer.write(files_to_process, mock_git_meta, "8.0.0", {}, [])
         
     # 4. Assert cleanup
     mock_temp_out.rename.assert_called_once_with(outfile)

@@ -28,7 +28,8 @@ from ..system import get_git_meta
 from ..processor import FileProcessor, ProcessorMiddleware
 from ..writing import ChecksumWriter, MarkdownWriter, JsonWriter
 from ..version import VERSION
-from ..scanning import SecretScanner
+from ..scanning import SecretScanner, TodoScanner
+from ..notifications import NotificationManager
 
 
 class SingleRunOrchestrator:
@@ -68,6 +69,8 @@ class SingleRunOrchestrator:
         diff_since: Optional[str] = None,
         scan_secrets: bool = False,
         hide_secrets: bool = False,
+        scan_todos: bool = False,
+        notify_topic: Optional[str] = None,
     ):
         # Store all parameters as instance attributes
         self.root = root
@@ -102,6 +105,8 @@ class SingleRunOrchestrator:
         self.diff_since = diff_since
         self.scan_secrets = scan_secrets
         self.hide_secrets = hide_secrets
+        self.scan_todos = scan_todos
+        self.notify_topic = notify_topic
         
         # ⚡ REFACTOR: Store anyio.Path version of root
         self.anyio_root = anyio.Path(self.root)
@@ -118,6 +123,17 @@ class SingleRunOrchestrator:
             except FileNotFoundError:
                 pass  # File may have vanished, skip
         return size
+
+    def _get_total_lines_sync(self, files: List[str]) -> int:
+        """Helper to run blocking line count calls in a thread."""
+        lines = 0
+        for f in files:
+            try:
+                with open(self.root / f, "r", errors="ignore") as file:
+                    lines += sum(1 for _ in file)
+            except FileNotFoundError:
+                pass
+        return lines
 
     def _compress_file_sync(self, in_file: Path, out_file: Path):
         """Blocking helper to gzip a file."""
@@ -138,6 +154,7 @@ class SingleRunOrchestrator:
         effective_git_ls_files = self.git_ls_files or cfg.git_ls_files
         effective_scan_secrets = self.scan_secrets or cfg.scan_secrets
         effective_hide_secrets = self.hide_secrets or cfg.hide_secrets
+        effective_scan_todos = self.scan_todos or cfg.scan_todos
 
         includes = [p.strip() for p in self.include.split(",") if p.strip()]
         excludes = [p.strip() for p in self.exclude.split(",") if p.strip()]
@@ -243,8 +260,14 @@ class SingleRunOrchestrator:
                         middlewares: List[ProcessorMiddleware] = []
                         if effective_scan_secrets:
                             middlewares.append(
-                                SecretScanner(hide_secrets=effective_hide_secrets)
+                                SecretScanner(
+                                    hide_secrets=effective_hide_secrets,
+                                    custom_patterns=cfg.custom_secret_patterns,
+                                )
                             )
+                        if effective_scan_todos:
+                            todo_scanner = TodoScanner()
+                            middlewares.append(todo_scanner)
                         
                         # ⚡ REFACTOR: Step 2 - Process files
                         processor = FileProcessor(
@@ -256,16 +279,40 @@ class SingleRunOrchestrator:
                         )
                         
                         # Step 3 - Format output
+                        total_lines = await anyio.to_thread.run_sync(
+                            self._get_total_lines_sync, files_list
+                        )
+                        stats = {
+                            "total_files": len(files_list),
+                            "total_lines": total_lines,
+                        }
+
                         if self.format == "json":
                             writer = JsonWriter(outfile)
-                            await writer.write(processed_files, gmeta, VERSION)
+                            await writer.write(
+                                processed_files,
+                                gmeta,
+                                VERSION,
+                                stats=stats,
+                                todo_findings=todo_scanner.findings
+                                if effective_scan_todos
+                                else [],
+                            )
                         else:
                             writer = MarkdownWriter(
-                                outfile, 
-                                self.no_toc, 
+                                outfile,
+                                self.no_toc,
                                 self.tree_toc,
                             )
-                            await writer.write(processed_files, gmeta, VERSION)
+                            await writer.write(
+                                processed_files,
+                                gmeta,
+                                VERSION,
+                                stats=stats,
+                                todo_findings=todo_scanner.findings
+                                if effective_scan_todos
+                                else [],
+                            )
 
                 # Step 4 - Compress
                 if self.compress:
@@ -320,6 +367,12 @@ class SingleRunOrchestrator:
                     errors=len(processed_files) - success_count,
                     output=str(outfile),
                 )
+
+                if self.notify_topic:
+                    notification_manager = NotificationManager(self.notify_topic)
+                    await notification_manager.send(
+                        f"Dump complete: {outfile.name} ({success_count}/{len(processed_files)} files)"
+                    )
             finally:
                 await anyio.to_thread.run_sync(temp_dir.cleanup)
 

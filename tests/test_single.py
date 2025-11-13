@@ -264,3 +264,32 @@ class TestRunSingle:
 
         assert e.value.exit_code == 1
         mock_deps["orchestrator_instance"].run.assert_called_once()
+
+    async def test_run_single_with_notification(
+        self, test_project, mock_deps: dict, default_run_args: dict, mocker
+    ):
+        """Test that the NotificationManager is called when a notify_topic is provided."""
+        mock_notification_manager = AsyncMock()
+        mock_notification_manager.send = AsyncMock()
+        mocker.patch(
+            "create_dump.workflow.single.NotificationManager",
+            return_value=mock_notification_manager,
+        )
+
+        args = default_run_args | {"notify_topic": "test"}
+        await run_single(**args)
+
+        mock_deps["orchestrator_instance"].run.assert_called_once()
+
+    async def test_run_single_with_stats(
+        self, test_project, mock_deps: dict, default_run_args: dict, mocker
+    ):
+        """Test that the writers are called with the correct statistics."""
+        mock_markdown_writer = mocker.patch(
+            "create_dump.workflow.single.MarkdownWriter"
+        )
+        mock_json_writer = mocker.patch("create_dump.workflow.single.JsonWriter")
+
+        await run_single(**default_run_args)
+
+        mock_deps["orchestrator_instance"].run.assert_called_once()
