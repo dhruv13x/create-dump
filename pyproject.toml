@@ -83,6 +83,14 @@ python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
 
+[tool.create-dump]
+use_gitignore = true
+git_meta = true
+max_file_size_kb = 5000
+# git_ls_files = false
+# scan_secrets = false
+# hide_secrets = false
+
 [tool.coverage.run]
 source = ["src"]
 branch = true
@@ -107,11 +115,3 @@ addopts = [
 ]
 log_cli = true
 log_cli_level = "INFO"
-
-[tool.create-dump]
-use_gitignore = true
-git_meta = true
-max_file_size_kb = 5000
-# git_ls_files = false
-# scan_secrets = false
-# hide_secrets = false
