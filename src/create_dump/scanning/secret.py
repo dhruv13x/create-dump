@@ -1,4 +1,5 @@
-# src/create_dump/scanning.py
+# src/create_dump/scanning/secret.py
+
 
 """Secret scanning and redaction middleware."""
 

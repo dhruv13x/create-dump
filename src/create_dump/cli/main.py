@@ -23,7 +23,10 @@ from ..logging import setup_logging, styled_print
 from .single import single
 from .batch import batch_app
 # ✨ NEW: Import the rollback function directly
+from ..banner import print_logo
 from .rollback import rollback
+
+print_logo()
 
 try:
     __version__ = metadata.version("create-dump")
@@ -36,16 +39,7 @@ app = typer.Typer(
     name="create-dump",
     add_completion=True,
     pretty_exceptions_enable=True,
-    help='''
-                                                                                              
-░█████╗░██████╗░███████╗░█████╗░████████╗███████╗░░░░░░██████╗░██╗░░░██╗███╗░░░███╗██████╗░  
-██╔══██╗██╔══██╗██╔════╝██╔══██╗╚══██╔══╝██╔════╝░░░░░░██╔══██╗██║░░░██║████╗░████║██╔══██╗  
-██║░░╚═╝██████╔╝█████╗░░███████║░░░██║░░░█████╗░░█████╗██║░░██║██║░░░██║██╔████╔██║██████╔╝  
-██║░░██╗██╔══██╗██╔══╝░░██╔══██║░░░██║░░░██╔══╝░░╚════╝██║░░██║██║░░░██║██║╚██╔╝██║██╔═══╝░  
-╚█████╔╝██║░░██║███████╗██║░░██║░░░██║░░░███████╗░░░░░░██████╔╝╚██████╔╝██║░╚═╝░██║██║░░░░░  
-░╚════╝░╚═╝░░╚═╝╚══════╝╚═╝░░╚═╝░░░╚═╝░░░╚══════╝░░░░░░╚═════╝░░╚════╝░╚═╝░░░░░╚═╝╚═╝░░░░░
-    
-    Enterprise-grade code dump utility for projects and monorepos.''',
+    help="Enterprise-grade code dump utility for projects and monorepos.",
     context_settings={"help_option_names": ["-h", "--help"]},
 )
 
@@ -164,7 +158,6 @@ def main_callback(
 
     Defaults to 'single' mode if no subcommand provided.
     """
-    
     # Setup logging immediately
     setup_logging(verbose=verbose, quiet=quiet)
 
