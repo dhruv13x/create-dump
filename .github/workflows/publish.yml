@@ -7,44 +7,50 @@ on:
 
 permissions:
   contents: read
-  id-token: write  # Required for OIDC Trusted Publishing to PyPI
+  id-token: write  # Required for PyPI OIDC Trusted Publishing
 
 jobs:
   build-and-publish:
     name: Build & Publish
     runs-on: ubuntu-latest
-    environment: pypi  # Optional: enables manual approval if configured in repo settings
+    environment: pypi # Assumes a GitHub environment named 'pypi' is configured
 
     steps:
       - name: 🧩 Checkout code
         uses: actions/checkout@v4
 
-      - name: 🐍 Set up Python 3.12
+      - name: 🐍 Set up Python 3.13
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.13"
 
-      # Install all build and test tools
-      - name: 📦 Install build and test tools
+      - name: 📦 Install build, test, and dev tools
         run: |
           python -m pip install --upgrade pip
-          # Install from [dev] dependencies + build tools
-          pip install .[dev] build twine codecov
+          # Install core build tools
+          pip install build twine
+          # Install project-specific development dependencies
+          # This assumes 'dev' extra is defined in pyproject.toml and includes
+          # pytest, pytest-cov, ruff, black, mypy, etc.
+          pip install .[dev]
+          # Install codecov-action dependency if not already in [dev]
+          pip install codecov
 
-      # 🧪 Run tests and check coverage
       - name: 🧪 Run tests & generate coverage
+        # This command assumes pytest is used and the main package code is in 'src'.
+        # If a project's main package is named differently (e.g., 'src/my_tool_name'),
+        # '--cov=src' should still work if the package is directly under 'src'.
         run: pytest --cov=src --cov-report=xml
 
-      # 📊 Upload coverage to Codecov
       - name: 📊 Upload coverage reports to Codecov
+        # Requires a CODECOV_TOKEN secret to be configured in the repository settings.
         uses: codecov/codecov-action@v4
         with:
-          token: ${{ secrets.CODECOV_TOKEN }} # Must be set in repo secrets
+          token: ${{ secrets.CODECOV_TOKEN }}
           file: ./coverage.xml
           verbose: true
-          fail_ci_if_error: true # Fail the build if upload fails
+          fail_ci_if_error: true
 
-      # ⚙️ Build distribution packages
       - name: ⚙️ Build distribution packages
         run: python -m build
 
@@ -56,4 +62,3 @@ jobs:
         with:
           verbose: true
           skip-existing: false  # Fail if version already exists (prevents accidental overwrites)
-          
