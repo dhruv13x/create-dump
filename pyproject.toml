@@ -92,12 +92,15 @@ max_file_size_kb = 5000
 # hide_secrets = false
 
 [tool.coverage.run]
-source = ["src"]
+source = ["src/create_dump"]
 branch = true
-omit = ["*/tests/*"]
+omit = [
+  "*/tests/*",
+  "*/__main__.py",
+]
 
 [tool.coverage.report]
-fail_under = 90
+fail_under = 97
 show_missing = true
 
 [tool.pytest.ini_options]
@@ -108,10 +111,9 @@ addopts = [
   "-ra",
   "--strict-config",
   "--strict-markers",
-  "--cov",
-  "--cov-report=term-missing",
-  "--cov-report=html",
+  "--cov=src/create_dump",
   "--cov-report=term-missing:skip-covered",
+  "--cov-report=html",
 ]
 log_cli = true
 log_cli_level = "INFO"
