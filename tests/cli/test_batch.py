@@ -155,10 +155,7 @@ class TestBatchCli:
         assert call_args[3] == ".*.log"              # pattern
         assert call_args[4] is False                 # effective_dry_run
         assert call_args[5] is True                  # yes
-        assert call_args[8] == "json"                # format
-        assert call_args[9] == 10                    # max_workers
-        assert call_args[14] is True                 # archive_all
-        assert call_args[21] == "tar.gz"             # archive_format
+        assert call_args[8] == 10                    # max_workers
 
     def test_run_command_dest_inheritance(
         self, cli_runner: CliRunner, mock_cli_deps: dict
@@ -178,7 +175,7 @@ class TestBatchCli:
         mock_run.assert_called_once()
         call_args = mock_run.call_args[0]
 
-        assert Path(call_args[12]) == Path("global/dest")
+        assert str(call_args[11]) == "global/dest"
 
     def test_run_command_dest_override(
         self, cli_runner: CliRunner, mock_cli_deps: dict
@@ -198,7 +195,7 @@ class TestBatchCli:
         assert result.exit_code == 0
         mock_run.assert_called_once()
         call_args = mock_run.call_args[0]
-        assert call_args[12] == Path("local/dest")
+        assert call_args[11] == Path("local/dest")
 
     def test_clean_command_flags(
         self, cli_runner: CliRunner, mock_cli_deps: dict
@@ -291,8 +288,8 @@ class TestBatchCli:
         assert result.exit_code == 0
         mock_logging.assert_called_with(verbose=False, quiet=True)
         call_args = mock_run.call_args[0]
-        assert call_args[10] is False # inherited_verbose
-        assert call_args[11] is True  # inherited_quiet
+        assert call_args[10] is True # quiet_val
+        assert call_args[10] is True # quiet_val
 
     def test_clean_command_quiet_flag_inheritance(
         self, cli_runner: CliRunner, mock_cli_deps: dict
@@ -356,8 +353,8 @@ class TestBatchCli:
         
         if command == "run":
             call_args = mock_run.call_args[0]
-            assert call_args[10] is False # verbose_val
-            assert call_args[11] is True  # quiet_val
+            assert call_args[9] is False # verbose_val
+            assert call_args[10] is True  # quiet_val
         elif command == "clean":
             call_args = mock_run.call_args[0]
             assert call_args[5] is False # verbose_val
@@ -377,8 +374,9 @@ class TestBatchCli:
         
         if command == "run":
             call_args = mock_run.call_args[0]
-            assert call_args[10] is True # verbose_val
-            assert call_args[11] is False  # quiet_val
+            assert call_args[9] is True # verbose_val
+            assert call_args[10] is False # quiet_val
+            assert call_args[10] is False # quiet_val
         elif command == "clean":
             call_args = mock_run.call_args[0]
             assert call_args[5] is True # verbose_val

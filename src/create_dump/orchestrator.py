@@ -185,6 +185,8 @@ async def run_batch(
     archive_keep_last: Optional[int] = None,
     archive_clean_root: bool = False,
     atomic: bool = True,
+    format: str = "md", # Added
+    archive_format: str = "zip", # Added
 ) -> None:
     root = root.resolve()
     cfg = load_config()
@@ -223,6 +225,7 @@ async def run_batch(
             # ⚡ FIX: Call renamed async function
             await run_single(
                 root=sub_root, dry_run=dry_run, yes=accept_prompts or yes, no_toc=False,
+                tree_toc=False, format=format, archive_format=archive_format, # Added these arguments
                 compress=compress, exclude="", include="", max_file_size=cfg.max_file_size_kb,
                 use_gitignore=cfg.use_gitignore, git_meta=cfg.git_meta, progress=False,
                 max_workers=16, archive=False, archive_all=False, archive_search=False,

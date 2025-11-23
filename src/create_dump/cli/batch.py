@@ -130,7 +130,6 @@ def run(
         yes, # 'yes' is simple, just pass it
         accept_prompts,
         compress,
-        format,
         max_workers,
         verbose_val, # Pass resolved value
         quiet_val,   # Pass resolved value
@@ -143,7 +142,8 @@ def run(
         archive_keep_latest,
         archive_keep_last,
         archive_clean_root,
-        archive_format,
+        format, # Added
+        archive_format, # Added
     )
 
 

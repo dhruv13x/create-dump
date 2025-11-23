@@ -6,16 +6,16 @@ build-backend = "hatchling.build"
 
 [project]
 name = "create-dump"
-version = "13.0.0"
+version = "14.0.0"
 description = "Enterprise-grade code dump utility for monorepos"
 readme = "README.md"
 requires-python = ">=3.11"
 
-author = "dhruv"
+author = "dhruv13x"
 author_email = "dhruv13x@gmail.com"
 
 authors = [
-  { name = "dhruv", email = "dhruv13x@gmail.com" }
+  { name = "dhruv13x", email = "dhruv13x@gmail.com" }
 ]
 
 license = { text = "MIT © dhruv13x" }
