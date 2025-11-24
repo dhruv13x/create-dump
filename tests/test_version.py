@@ -17,7 +17,7 @@ def test_version_is_consistent():
     expected_version = pyproject_data["project"]["version"]
 
     # Assert that the version in pyproject.toml is the expected one
-    assert expected_version == "14.0.0"
+    assert expected_version == "14.0.1"
 
 def test_version_format_semver():
     """Test Case 2: Version adheres to semantic versioning pattern."""

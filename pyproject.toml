@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "create-dump"
-version = "14.0.0"
+version = "14.0.1"
 description = "Enterprise-grade code dump utility for monorepos"
 readme = "README.md"
 requires-python = ">=3.11"
