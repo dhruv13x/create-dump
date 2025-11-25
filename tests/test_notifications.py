@@ -12,6 +12,8 @@ async def test_send_ntfy_notification_success(mocker):
     Tests that send_ntfy_notification calls httpx.post with the correct arguments.
     """
     mock_post = mocker.patch("httpx.post", new_callable=AsyncMock)
+    # Configure the mock to avoid 'coroutine not awaited' warnings on the sync method
+    mock_post.return_value.raise_for_status = mocker.Mock()
 
     await send_ntfy_notification("test_topic", "test_message", "test_title")
 
@@ -21,6 +23,7 @@ async def test_send_ntfy_notification_success(mocker):
         headers={"Title": "test_title"},
         timeout=10.0,
     )
+    mock_post.return_value.raise_for_status.assert_called_once()
 
 @pytest.mark.asyncio
 async def test_send_ntfy_notification_http_error(mocker):
