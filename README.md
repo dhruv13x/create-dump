@@ -64,6 +64,9 @@ create-dump batch --root ./monorepo --archive --keep-last 5
 # SRE / Git-only dump in watch mode with secret redaction
 create-dump single --git-ls-files --watch --scan-secrets --hide-secrets
 
+# Scan for TODOs and get a push notification on completion
+create-dump single --scan-todos --notify-topic your_ntfy_topic
+
 # Rollback a dump file to a new directory
 create-dump rollback --file ./dumps/my-snapshot.md
 
@@ -103,6 +106,12 @@ create-dump rollback --file ./dumps/my-snapshot.md
 
   * **Observability**
     Prometheus metrics (e.g., `create_dump_duration_seconds`, `create_dump_files_total`).
+
+  * **TODO/FIXME Scanning**
+    Scan for `TODO` or `FIXME` tags in code and append a summary to the dump (`--scan-todos`).
+
+  * **Push Notifications**
+    Get notified on dump completion via `ntfy.sh` push notifications (`--notify-topic <topic>`).
 
 | Feature | Single Mode | Batch Mode |
 | :--- | :--- | :--- |
@@ -186,9 +195,59 @@ metrics_port = 8000
 
 # Redact found secrets (requires scan_secrets=true)
 # hide_secrets = true
+
+# Scan for TODOs and append a report
+# scan_todos = true
+
+# Default ntfy.sh topic for notifications
+# notify_topic = "your_ntfy_topic"
 ```
 
 Override any setting via CLI flags.
+
+### CLI Arguments
+
+| Argument | Shorthand | Description | Default |
+| :--- | :--- | :--- | :--- |
+| `--version` | `-V` | Show version and exit. | `false` |
+| `--init` | | Run interactive wizard to create `create_dump.toml`. | `false` |
+| `--config` | | Path to TOML config file. | `null` |
+| `--profile` | | Config profile to merge from `pyproject.toml`. | `null` |
+| `--yes` | `-y` | Assume yes for prompts and deletions. | `false` |
+| `--dry-run` | `-d` | Simulate without writing files. | `false` |
+| `--no-dry-run` | `-nd` | Run for real (disables simulation). | `false` |
+| `--verbose` | `-v` | Enable debug logging. | `false` |
+| `--quiet` | `-q` | Suppress output (CI mode). | `false` |
+| `--dest` | | Destination dir for output. | `.` |
+| `--no-toc` | | Omit table of contents. | `false` |
+| `--tree-toc` | | Render Table of Contents as a file tree. | `false` |
+| `--format` | | Output format (md or json). | `md` |
+| `--compress` | `-c` | Gzip the output file. | `false` |
+| `--progress` / `--no-progress` | `-p` | Show processing progress. | `true` |
+| `--allow-empty` | | Succeed on 0 files. | `false` |
+| `--metrics-port` | | Prometheus export port. | `8000` |
+| `--exclude` | | Comma-separated exclude patterns. | `""` |
+| `--include` | | Comma-separated include patterns. | `""` |
+| `--max-file-size` | | Max file size in KB. | `null` |
+| `--use-gitignore` / `--no-use-gitignore` | | Incorporate .gitignore excludes. | `true` |
+| `--git-meta` / `--no-git-meta` | | Include Git branch/commit. | `true` |
+| `--max-workers` | | Concurrency level. | `16` |
+| `--watch` | | Run in live-watch mode. | `false` |
+| `--git-ls-files` | | Use 'git ls-files' for file collection. | `false` |
+| `--diff-since` | | Only dump files changed since a specific git ref. | `null` |
+| `--scan-secrets` | | Scan files for secrets. Fails dump if secrets are found. | `false` |
+| `--hide-secrets` | | Redact found secrets (requires --scan-secrets). | `false` |
+| `--scan-todos` | | Scan files for TODO/FIXME tags and append a summary. | `false` |
+| `--notify-topic` | | ntfy.sh topic for push notification on completion. | `null` |
+| `--archive` | `-a` | Archive prior dumps into ZIP. | `false` |
+| `--archive-all` | | Archive dumps grouped by prefix. | `false` |
+| `--archive-search` | | Search project-wide for dumps. | `false` |
+| `--archive-include-current` / `--no-archive-include-current` | | Include this run in archive. | `true` |
+| `--archive-no-remove` | | Preserve originals post-archiving. | `false` |
+| `--archive-keep-latest` / `--no-archive-keep-latest` | | Keep latest dump live or archive all. | `true` |
+| `--archive-keep-last` | | Keep last N archives. | `null` |
+| `--archive-clean-root` | | Clean root post-archive. | `false` |
+| `--archive-format` | | Archive format (zip, tar.gz, tar.bz2). | `zip` |
 
 -----
 
@@ -205,6 +264,9 @@ create-dump single --diff-since main --watch
 
 # Dump using git, scan for secrets, and redact them
 create-dump single --git-ls-files --scan-secrets --hide-secrets
+
+# Scan for TODOs and send a notification
+create-dump single --scan-todos --notify-topic your_ntfy_topic
 
 # Dry run with verbose logging
 create-dump single --dry-run --verbose
