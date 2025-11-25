@@ -43,6 +43,7 @@ def setup_logging(verbose: bool = False, quiet: bool = False) -> None:
     processors = [
         structlog.processors.TimeStamper(fmt="iso"),
         structlog.stdlib.add_log_level,
+        structlog.stdlib.PositionalArgumentsFormatter(),
         structlog.processors.StackInfoRenderer(),
         structlog.processors.format_exc_info,
     ]

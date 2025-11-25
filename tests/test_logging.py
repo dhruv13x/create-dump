@@ -41,7 +41,7 @@ class TestLoggingSetup:
             
             # ⚡ FIX: The code correctly adds 5 processors (format_exc_info was missed)
             # 1. TimeStamper, 2. add_log_level, 3. StackInfoRenderer, 4. format_exc_info, 5. JSONRenderer
-            assert len(processors) == 5
+            assert len(processors) == 6
             
             # ⚡ FIX: Check the *type* of the instance, not a string
             assert isinstance(processors[-1], structlog.processors.JSONRenderer)
@@ -64,7 +64,7 @@ class TestLoggingSetup:
                 processors = mock_configure.call_args[1]["processors"]
                 
                 # ⚡ FIX: The code adds 5 processors
-                assert len(processors) == 5
+                assert len(processors) == 6
                 
                 # ⚡ FIX: Check that the last processor *is* our mock instance
                 assert processors[-1] is mock_renderer_instance
