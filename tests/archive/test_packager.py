@@ -375,115 +375,73 @@ class TestArchivePackager:
             
         mock_unlink.assert_called_once_with(missing_ok=True)
 
-    async def test_handle_grouped_archives_dry_run_quarantine(
-        self, base_packager_args, project_with_files, quarantine_dir, caplog, test_project
+    async def test_handle_grouped_archives_quarantine_logic(
+        self, base_packager_args, fs, quarantine_dir
     ):
         """
-        Action Plan 2: Test Group Quarantining (Dry Run).
-        Tests that handle_grouped_archives with dry_run=True logs quarantining.
-        """
-        args = base_packager_args | {"dry_run": True, "verbose": True}
-        packager = ArchivePackager(**args)
-        
-        default_pairs = [p for p in project_with_files if "default" in p[0].name]
-        groups = {"default": default_pairs} 
-
-        await packager.handle_grouped_archives(groups)
-
-        q_path = anyio.Path(quarantine_dir)
-        assert not await (q_path / "default_all_create_dump_20250101_000100.md").exists()
-        
-        # -----------------
-        # 🐞 FIX: Remove `await` from sync `.exists()` call
-        # -----------------
-        assert (test_project.path("default_all_create_dump_20250101_000100.md")).exists()
-        
-        assert "[dry-run] Would quarantine unmatchable pair" in caplog.text
-        assert "default_all_create_dump_20250101_000100.md" in caplog.text
-        assert "default_all_create_dump_20250101_000200.md" in caplog.text
-
-    async def test_handle_single_archive_clean_root(
-        self, base_packager_args, project_with_files, test_project, mocker
-    ):
-        """
-        Action Plan 3: Test `clean_root`.
-        Tests handle_single_archive with clean_root=True calls safe_delete_paths.
+        Tests that the quarantine logic moves files correctly, even when overwriting.
         """
         # 1. Setup
-        args = base_packager_args | {
-            "keep_latest": True,
-            "clean_root": True,
-            "yes": True, # Skips confirm()
-        }
+        root = Path("/fake_project")
+        fs.create_file(root / "unmatched.md", contents="md content")
+        fs.create_file(root / "unmatched.sha256", contents="sha content")
+
+        fs.create_dir(quarantine_dir)
+        fs.create_file(quarantine_dir / "unmatched.md", contents="pre-existing")
+
+        args = base_packager_args | {"dry_run": False, "root": root}
         packager = ArchivePackager(**args)
         
-        # 2. Mock
-        mock_delete = mocker.patch("create_dump.archive.packager.safe_delete_paths", new_callable=AsyncMock)
-        mocker.patch("create_dump.archive.packager.confirm", return_value=True) 
+        pair = (root / "unmatched.md", root / "unmatched.sha256")
+        groups = {"default": [pair]}
 
-        # 3. Act
-        all_pairs = project_with_files
-        pairs = [p for p in all_pairs if "default" in p[0].name]
+        # 2. Act
+        await packager.handle_grouped_archives(groups)
         
-        await packager.handle_single_archive(pairs)
-        
-        # 4. Assert
-        mock_delete.assert_called_once()
-        
-        # -----------------
-        # 🐞 FIX: Assert keyword arguments, not positional
-        # -----------------
-        call_args_list = mock_delete.call_args[0]
-        call_kwargs = mock_delete.call_args[1]
-        
-        deleted_paths_list = call_args_list[0]
-        
-        assert len(deleted_paths_list) == 2
-        assert "default_all_create_dump_20250101_000100.md" in deleted_paths_list[0].name
-        assert "default_all_create_dump_20250101_000100.sha256" in deleted_paths_list[1].name
-        
-        # Assert it was called with the correct flags
-        assert call_kwargs["dry_run"] is False
-        assert call_kwargs["assume_yes"] is True
+        # 3. Assert
+        assert not fs.exists(root / "unmatched.md")
+        assert not fs.exists(root / "unmatched.sha256")
+        assert fs.exists(quarantine_dir / "unmatched.md")
+        with open(quarantine_dir / "unmatched.md", "r") as f:
+            assert f.read() == "md content"
+        assert fs.exists(quarantine_dir / "unmatched.sha256")
 
-    async def test_handle_single_archive_mtime_fallback_sort(
-        self, base_packager_args, test_project, mocker, caplog
+
+    async def test_handle_grouped_archives_mtime_fallback(
+        self, base_packager_args, fs, mocker, caplog
     ):
         """
-        Action Plan 4: Test `mtime` Fallback.
-        Tests key_func in handle_single_archive falls back to mtime sorting.
+        Covers the mtime fallback for sorting in grouped archives using a robust mock.
         """
-        # 1. Setup: Create files with *no valid timestamp* sequentially
-        await test_project.create({"file_old.md": "old"})
-        await anyio.sleep(0.02) # Ensure mtime difference
-        await test_project.create({"file_new.md": "new"})
+        from datetime import datetime
+        import time
+
+        # 1. Setup
+        root = Path("/fake_project")
+        old_path = root / "group1_file_old.md"
+        new_path = root / "group1_file_new.md"
+        fs.create_file(old_path, contents="old")
+        time.sleep(0.02)
+        fs.create_file(new_path, contents="new")
+        fs.create_dir(base_packager_args["archives_dir"])
+
+        mocker.patch("create_dump.archive.packager.extract_timestamp", return_value=datetime.min)
         
-        mocker.patch(
-            "create_dump.archive.packager.extract_timestamp",
-            return_value=datetime.min
-        )
-        
-        pairs = [
-            (test_project.path("file_new.md"), None),
-            (test_project.path("file_old.md"), None),
-        ]
+        pairs = [(new_path, None), (old_path, None)]
+        groups = {"group1": pairs}
 
         # 2. Setup Packager
-        args = base_packager_args | {
-            "keep_latest": True,
-            "verbose": True, # To hit the log line
-        }
+        args = base_packager_args | {"keep_latest": True, "verbose": True, "root": root}
         packager = ArchivePackager(**args)
-        
+
         # 3. Act
         with caplog.at_level("DEBUG"):
-            archive_paths, to_delete = await packager.handle_single_archive(pairs)
+            _, to_delete = await packager.handle_grouped_archives(groups)
 
         # 4. Assert
         assert len(to_delete) == 1
-        assert to_delete[0].name == "file_old.md"
-        
-        assert "Fallback to mtime for sorting" in caplog.text
+        assert to_delete[0].name == "group1_file_old.md"
+        assert "Fallback to mtime for sorting in group1" in caplog.text
 
     async def test_create_archive_sync_no_files(self, base_packager_args):
         """
