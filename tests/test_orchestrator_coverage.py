@@ -9,12 +9,11 @@ import re
 from typer import Exit
 
 from create_dump.orchestrator import (
-    AtomicBatchTxn,
     run_batch,
     validate_batch_staging,
     _centralize_outputs,
-    ROLLBACKS_TOTAL
 )
+from create_dump.transaction import AtomicBatchTxn, ROLLBACKS_TOTAL
 
 @pytest.fixture
 def mock_fs(tmp_path):

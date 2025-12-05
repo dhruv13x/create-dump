@@ -26,8 +26,8 @@ from create_dump.orchestrator import (
     atomic_batch_txn,
     # _centralize_outputs, # No longer needed, imported above
     # validate_batch_staging, # No longer needed, imported above
-    AtomicBatchTxn  # ⚡ FIX: Import AtomicBatchTxn
 )
+from create_dump.transaction import AtomicBatchTxn  # ⚡ FIX: Import AtomicBatchTxn from transaction
 from create_dump.core import Config
 # ⚡ RENAMED: Import to match new API
 from create_dump.path_utils import find_matching_files
@@ -51,7 +51,9 @@ def mock_config() -> Config:
 @pytest.fixture
 def mock_logger(mocker):
     # ⚡ FIX: Patch the logger where it is *used* (in the orchestrator module)
-    return mocker.patch("create_dump.orchestrator.logger")
+    mock_log = mocker.patch("create_dump.orchestrator.logger")
+    mocker.patch("create_dump.transaction.logger", mock_log)
+    return mock_log
 
 
 @pytest.fixture
@@ -69,8 +71,8 @@ def mock_metrics(mocker):
     mock_duration = mocker.patch("create_dump.orchestrator.DUMP_DURATION")
     mock_duration.labels.return_value.time.return_value = mock_duration_ctx
     
-    # 🐞 FIX: Patch the metric where it is *used*
-    mock_rollbacks = mocker.patch("create_dump.orchestrator.ROLLBACKS_TOTAL")
+    # 🐞 FIX: Patch the metric where it is *used* (now in transaction.py)
+    mock_rollbacks = mocker.patch("create_dump.transaction.ROLLBACKS_TOTAL")
     mock_rollbacks.labels.return_value = MagicMock()
     return mock_rollbacks
 
