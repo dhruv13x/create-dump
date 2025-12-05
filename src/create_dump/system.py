@@ -151,3 +151,31 @@ async def get_git_diff_files(root: Path, ref: str) -> List[str]:
     except Exception as e:
         logger.error("Failed to run git diff", ref=ref, error=str(e))
         return []
+
+
+async def get_git_diff_content(root: Path, ref: str, files: List[str]) -> str:
+    """
+    Run 'git diff' for specific files and return the content.
+    """
+    # Create the command: git diff <ref> -- <file1> <file2> ...
+    cmd = ["git", "diff", ref, "--"] + files
+
+    try:
+        stdout, stderr, code = await _run_async_cmd(cmd, cwd=root)
+
+        if code != 0:
+            logger.error(
+                "git diff content failed",
+                ref=ref,
+                retcode=code,
+                error=stderr
+            )
+            # In case of failure, we might want to raise or return empty.
+            # Returning empty string signals no diff or failure.
+            return ""
+
+        return stdout
+
+    except Exception as e:
+        logger.error("Failed to run git diff content", ref=ref, error=str(e))
+        return ""

@@ -32,7 +32,7 @@ This is a visionary, integration-oriented plan that categorizes features from **
 **Focus**: Feature parity with top competitors, user experience improvements, and robust error handling.
 **Timeline**: Q2
 
-- [ ] **"Diff-Only" Dump Format**: Output a `.diff` or `.patch` file instead of the full file content when using `--diff-since`.
+- [x] **"Diff-Only" Dump Format**: Output a `.diff` or `.patch` file instead of the full file content when using `--diff-since`.
 - [ ] **Smart Caching Strategy**: Implement persistent hashing to avoid reprocessing unchanged files in `--watch` mode (beyond basic re-runs).
 - [ ] **Database Dump Integration**: Add flags to execute `pg_dump` or `mysqldump` and embed the SQL output in the dump.
 - [ ] **ChatOps Expansion**: Native integration for sending notifications to Slack, Discord, and Telegram (beyond `ntfy.sh`).
