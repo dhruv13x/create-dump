@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 import anyio
 from typer import Exit
@@ -57,6 +57,7 @@ async def run_single(
     diff_since: Optional[str] = None,
     scan_secrets: bool = False,
     hide_secrets: bool = False,
+    secret_patterns: Optional[List[str]] = None,
     scan_todos: bool = False,
     notify_topic: Optional[str] = None,
 ) -> None:
@@ -106,6 +107,7 @@ async def run_single(
         diff_since=diff_since,
         scan_secrets=scan_secrets,
         hide_secrets=hide_secrets,
+        secret_patterns=secret_patterns,
         scan_todos=scan_todos,
         notify_topic=notify_topic,
     )

@@ -76,6 +76,7 @@ class SingleRunOrchestrator:
         diff_since: Optional[str] = None,
         scan_secrets: bool = False,
         hide_secrets: bool = False,
+        secret_patterns: Optional[List[str]] = None,
         scan_todos: bool = False,
         notify_topic: Optional[str] = None,
     ):
@@ -112,6 +113,7 @@ class SingleRunOrchestrator:
         self.diff_since = diff_since
         self.scan_secrets = scan_secrets
         self.hide_secrets = hide_secrets
+        self.secret_patterns = secret_patterns or []
         self.scan_todos = scan_todos
         self.notify_topic = notify_topic
         
@@ -163,6 +165,11 @@ class SingleRunOrchestrator:
             effective_git_ls_files = self.git_ls_files or cfg.git_ls_files
             effective_scan_secrets = self.scan_secrets or cfg.scan_secrets
             effective_hide_secrets = self.hide_secrets or cfg.hide_secrets
+
+            # Combine custom secret patterns from CLI and Config
+            combined_secret_patterns = self.secret_patterns + cfg.custom_secret_patterns
+            # Deduplicate patterns while preserving order
+            combined_secret_patterns = list(dict.fromkeys(combined_secret_patterns))
 
             includes = [p.strip() for p in self.include.split(",") if p.strip()]
             excludes = [p.strip() for p in self.exclude.split(",") if p.strip()]
@@ -269,7 +276,7 @@ class SingleRunOrchestrator:
                             middlewares.append(
                                 SecretScanner(
                                     hide_secrets=effective_hide_secrets,
-                                    custom_patterns=cfg.custom_secret_patterns,
+                                    custom_patterns=combined_secret_patterns,
                                 )
                             )
                         if self.scan_todos:

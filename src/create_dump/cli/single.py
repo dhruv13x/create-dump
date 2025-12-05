@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 import typer
 from typer import Exit
@@ -48,6 +48,7 @@ def single(
     diff_since: Optional[str] = typer.Option(None, "--diff-since", help="Only dump files changed since a specific git ref (e.g., 'main')."),
     scan_secrets: bool = typer.Option(False, "--scan-secrets", help="Scan files for secrets. Fails dump if secrets are found."),
     hide_secrets: bool = typer.Option(False, "--hide-secrets", help="Redact found secrets (requires --scan-secrets)."),
+    secret_patterns: Optional[List[str]] = typer.Option(None, "--secret-patterns", help="Custom regex patterns for secret scanning."),
     scan_todos: bool = typer.Option(False, "--scan-todos", help="Scan files for TODO/FIXME tags and append a summary."),
     notify_topic: Optional[str] = typer.Option(None, "--notify-topic", help="ntfy.sh topic for push notification on completion."),
 
@@ -155,6 +156,7 @@ def single(
             diff_since,
             scan_secrets,
             hide_secrets,
+            secret_patterns,
             scan_todos,
             notify_topic,
         )
