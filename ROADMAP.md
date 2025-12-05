@@ -19,7 +19,7 @@ This is a visionary, integration-oriented plan that categorizes features from "C
 - [x] **Observability**: Prometheus metrics for monitoring.
 - [x] **TODO/FIXME Scanning**: Scan for `TODO` or `FIXME` tags in code.
 - [x] **Push Notifications**: Get notified on dump completion via `ntfy.sh`.
-- [ ] **Per-Project Config Discovery**: Enhance `batch` mode to detect and use project-specific `create_dump.toml` files in a monorepo.
+- [x] **Per-Project Config Discovery**: Enhance `batch` mode to detect and use project-specific `create_dump.toml` files in a monorepo.
 - [ ] **Dump Header Statistics**: Add total lines of code and file count to the dump header for quick context.
 - [ ] **Custom Secret Scanning Rules**: Allow users to define custom regex patterns for secret scanning.
 - [ ] **Configuration Profiles**: Solidify logic for merging configuration profiles for different environments (e.g., `local`, `ci`).

@@ -18,7 +18,7 @@ import anyio
 from .archiver import ArchiveManager
 # ⚡ FIX: Import the renamed async function
 from .cleanup import safe_delete_paths
-from .core import Config, load_config, DEFAULT_DUMP_PATTERN
+from .core import Config, load_config, has_local_config, DEFAULT_DUMP_PATTERN
 # ⚡ FIX: Import the renamed async functions
 from .path_utils import confirm, find_matching_files, safe_is_within
 # ⚡ FIX: Import the renamed async function
@@ -222,12 +222,19 @@ async def run_batch(
 
     async def _run_single_wrapper(sub_root: Path):
         try:
+            # Determine configuration for this subdirectory
+            # If local config exists, use it; otherwise fallback to root config
+            use_cfg = cfg
+            if has_local_config(sub_root):
+                use_cfg = load_config(_cwd=sub_root)
+                logger.debug(f"Using local config for {sub_root}")
+
             # ⚡ FIX: Call renamed async function
             await run_single(
                 root=sub_root, dry_run=dry_run, yes=accept_prompts or yes, no_toc=False,
                 tree_toc=False, format=format, archive_format=archive_format, # Added these arguments
-                compress=compress, exclude="", include="", max_file_size=cfg.max_file_size_kb,
-                use_gitignore=cfg.use_gitignore, git_meta=cfg.git_meta, progress=False,
+                compress=compress, exclude="", include="", max_file_size=use_cfg.max_file_size_kb,
+                use_gitignore=use_cfg.use_gitignore, git_meta=use_cfg.git_meta, progress=False,
                 max_workers=16, archive=False, archive_all=False, archive_search=False,
                 archive_include_current=archive_include_current, archive_no_remove=archive_no_remove,
                 archive_keep_latest=archive_keep_latest, archive_keep_last=archive_keep_last,
