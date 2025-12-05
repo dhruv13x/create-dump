@@ -34,21 +34,28 @@ class ProcessorMiddleware(Protocol):
         """Processes a DumpFile. Can modify it in-place."""
         ...
 
+# ⚡ NEW: Import CacheManager Protocol
+class CacheManagerProtocol(Protocol):
+    async def get(self, file_path: str, stat: Any) -> Optional[Path]: ...
+    async def put(self, file_path: str, stat: Any, content_path: Path) -> None: ...
+
 
 class FileProcessor:
     """
     Reads source files concurrently and stores their content in temp files.
     """
 
-    # ⚡ REFACTOR: Update __init__ to accept middleware
+    # ⚡ REFACTOR: Update __init__ to accept middleware and cache_manager
     def __init__(
         self, 
         temp_dir: str, 
-        middlewares: List[ProcessorMiddleware] | None = None
+        middlewares: List[ProcessorMiddleware] | None = None,
+        cache_manager: Optional[CacheManagerProtocol] = None
     ):
         self.temp_dir = temp_dir
         self.files: List[DumpFile] = []
         self.middlewares = middlewares or []
+        self.cache_manager = cache_manager
         
     # ⚡ REFACTOR: Removed _scan_for_secrets
     # ⚡ REFACTOR: Removed _redact_secrets
@@ -59,10 +66,23 @@ class FileProcessor:
         dump_file: Optional[DumpFile] = None
         
         try:
+            lang = get_language(file_path)
+
+            # ⚡ SMART CACHING START
+            if self.cache_manager:
+                # We need blocking stat for now or use anyio.to_thread
+                # anyio.Path.stat is async
+                stat = await anyio.Path(file_path).stat()
+                cached_path = await self.cache_manager.get(file_path, stat)
+                if cached_path:
+                    # Cache Hit!
+                    logger.debug("Cache hit for file", path=file_path)
+                    FILES_PROCESSED.labels(status="cached").inc()
+                    return DumpFile(path=file_path, language=lang, temp_path=cached_path)
+            # ⚡ SMART CACHING END
+
             temp_filename = f"{uuid.uuid4().hex}.tmp"
             temp_anyio_path = anyio.Path(self.temp_dir) / temp_filename
-            
-            lang = get_language(file_path)
             
             async with await anyio.Path(file_path).open("r", encoding="utf-8", errors="replace") as src, \
                        await temp_anyio_path.open("w", encoding="utf-8") as tmp:
@@ -83,7 +103,16 @@ class FileProcessor:
                 if dump_file.error:
                     # Middleware failed this file (e.g., secrets found)
                     # The middleware is responsible for logging and metrics
+                    if temp_anyio_path:
+                         await temp_anyio_path.unlink(missing_ok=True)
                     return dump_file
+
+            # ⚡ SMART CACHING UPDATE
+            if self.cache_manager and not dump_file.error:
+                 # Re-fetch stat to be sure we have the latest one associated with what we read
+                 # (Technically there's a race condition if file changed during read, but this is best effort)
+                 stat = await anyio.Path(file_path).stat()
+                 await self.cache_manager.put(file_path, stat, Path(temp_anyio_path))
 
             FILES_PROCESSED.labels(status="success").inc()
             return dump_file

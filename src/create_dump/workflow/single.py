@@ -7,6 +7,7 @@ from __future__ import annotations
 import gzip
 import os
 import shutil
+import hashlib
 from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -31,6 +32,7 @@ from ..writing import ChecksumWriter, MarkdownWriter, JsonWriter
 from ..scanning.secret import SecretScanner
 from ..scanning.todo import TodoScanner
 from ..notifications import send_ntfy_notification
+from ..caching import CacheManager # ⚡ IMPORT CacheManager
 
 try:
     __version__ = metadata.version("create-dump")
@@ -79,6 +81,7 @@ class SingleRunOrchestrator:
         secret_patterns: Optional[List[str]] = None,
         scan_todos: bool = False,
         notify_topic: Optional[str] = None,
+        watch: bool = False, # Pass watch explicitly
     ):
         # Store all parameters as instance attributes
         self.root = root
@@ -119,6 +122,38 @@ class SingleRunOrchestrator:
         
         # ⚡ REFACTOR: Store anyio.Path version of root
         self.anyio_root = anyio.Path(self.root)
+
+        self.cache_manager: Optional[CacheManager] = None
+
+        # Calculate config hash for cache safety
+        self.config_hash = self._calculate_config_hash()
+
+    def _calculate_config_hash(self) -> str:
+        """Generates a stable hash of the processing configuration."""
+        # Include all flags that affect file processing or content
+        config_items = [
+            str(self.max_file_size),
+            str(self.use_gitignore),
+            str(self.git_ls_files),
+            str(self.scan_secrets),
+            str(self.hide_secrets),
+            ",".join(sorted(self.secret_patterns)),
+            str(self.scan_todos),
+            str(self.exclude),
+            str(self.include),
+             # Note: format/compress/archive options don't affect *intermediate* processing
+             # (FileProcessor output is raw content + metadata).
+             # But if middleware changes content (redaction), it matters.
+        ]
+        return hashlib.md5("".join(config_items).encode("utf-8")).hexdigest()
+
+    def enable_caching(self):
+        """Enables the smart caching strategy."""
+        cache_dir = self.root / ".create_dump_cache"
+        self.cache_manager = CacheManager(cache_dir, self.config_hash)
+        if not self.quiet:
+            logger.info("Smart caching enabled", cache_dir=str(cache_dir))
+
 
     def _get_stats_sync(self, files: List[str]) -> tuple[int, int]:
         """Calculates total files and lines of code."""
@@ -306,10 +341,15 @@ class SingleRunOrchestrator:
                             processor = FileProcessor(
                                 temp_dir.name,
                                 middlewares=middlewares, # Pass middleware list
+                                cache_manager=self.cache_manager # Pass cache manager
                             )
                             processed_files = await processor.dump_concurrent(
                                 files_list, self.progress, self.max_workers
                             )
+
+                            # ⚡ CACHE UPDATE: Save metadata if caching is enabled
+                            if self.cache_manager:
+                                await self.cache_manager.save()
 
                             # Step 3 - Format output
                             if self.format == "json":
