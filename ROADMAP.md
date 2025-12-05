@@ -1,12 +1,13 @@
 # 🗺️ The Smart Roadmap
 
-This is a visionary, integration-oriented plan that categorizes features from "Core Essentials" to "God Level" ambition.
+This is a visionary, integration-oriented plan that categorizes features from **"Core Essentials"** to **"God Level"** ambition.
 
 ---
 
-## Phase 1: Foundation (Q1)
+## Phase 1: Foundation (CRITICALLY MUST HAVE)
 
 **Focus**: Core functionality, stability, security, and basic usage.
+**Status**: Mostly Completed (Q1)
 
 - [x] **Branded Markdown Generation**: Auto TOC (list or tree), language-detected code blocks, Git metadata, timestamps.
 - [x] **Async-First & Concurrent**: Built on `anyio` for high-throughput, non-blocking I/O.
@@ -22,43 +23,49 @@ This is a visionary, integration-oriented plan that categorizes features from "C
 - [x] **Per-Project Config Discovery**: Enhance `batch` mode to detect and use project-specific `create_dump.toml` files in a monorepo.
 - [x] **Dump Header Statistics**: Add total lines of code and file count to the dump header for quick context.
 - [x] **Custom Secret Scanning Rules**: Allow users to define custom regex patterns for secret scanning.
-- [ ] **Configuration Profiles**: Solidify logic for merging configuration profiles for different environments (e.g., `local`, `ci`).
+- [x] **Configuration Profiles**: Merge configuration profiles for different environments (e.g., `local`, `ci`) from `pyproject.toml`.
 
 ---
 
-## Phase 2: The Standard (Q2)
+## Phase 2: The Standard (MUST HAVE)
 
 **Focus**: Feature parity with top competitors, user experience improvements, and robust error handling.
+**Timeline**: Q2
 
 - [ ] **"Diff-Only" Dump Format**: Output a `.diff` or `.patch` file instead of the full file content when using `--diff-since`.
-- [ ] **File Hashing & Caching**: Implement a cache to avoid reprocessing unchanged files in `--watch` mode.
-- [ ] **Database Dump Integration**: Add flags to execute `pg_dump` or `mysqldump` and include the output in the dump.
-- [ ] **ChatOps Notifications**: Native integration for sending notifications to Slack, Discord, and Telegram.
-- [ ] **Enhanced Error Reporting**: More detailed and user-friendly error messages, especially for configuration and I/O errors.
+- [ ] **Smart Caching Strategy**: Implement persistent hashing to avoid reprocessing unchanged files in `--watch` mode (beyond basic re-runs).
+- [ ] **Database Dump Integration**: Add flags to execute `pg_dump` or `mysqldump` and embed the SQL output in the dump.
+- [ ] **ChatOps Expansion**: Native integration for sending notifications to Slack, Discord, and Telegram (beyond `ntfy.sh`).
+- [ ] **Enhanced Error Reporting**: Human-friendly error messages with suggested fixes for common configuration/permissions issues.
+- [ ] **Docker Container Support**: Ability to target a running Docker container to dump its filesystem.
 
 ---
 
-## Phase 3: The Ecosystem (Q3-Q4)
+## Phase 3: The Ecosystem (INTEGRATION & SHOULD HAVE)
 
 **Focus**: Webhooks, API exposure, 3rd party plugins, SDK generation, and extensibility.
+**Timeline**: Q3
 
-- [ ] **Cloud Storage Uploads**: Add support for automatically uploading dumps to S3, GCS, and Azure Blob Storage.
-- [ ] **Persistent Server Mode**: A `create-dump serve` command that launches a lightweight FastAPI server to trigger dumps via webhooks.
-- [ ] **Official GitHub Action**: A dedicated GitHub Action to generate dumps for pull requests.
-- [ ] **Plugin Architecture**: Allow users to create and share their own plugins for custom collectors, scanners, and writers.
-- [ ] **SDK Generation**: A library that allows other Python applications to use `create-dump` programmatically.
+- [ ] **Cloud Storage Uploads**: Native support for uploading dumps to AWS S3, Google Cloud Storage, and Azure Blob Storage.
+- [ ] **Persistent Server Mode**: A `create-dump serve` command launching a lightweight FastAPI server for webhook-triggered dumps.
+- [ ] **Official GitHub Action**: A verified GitHub Action to generate dumps on Pull Requests or commits.
+- [ ] **Plugin Architecture**: A dynamic plugin system to allow users to write custom collectors, scanners, and writers.
+- [ ] **SDK Generation**: Refactor core logic into a stable library so other Python applications can `import create_dump`.
+- [ ] **Pre-commit Hook Integration**: Provide a standard `.pre-commit-hooks.yaml` for easy adoption.
 
 ---
 
 ## Phase 4: The Vision (GOD LEVEL)
 
-**Focus**: "Futuristic" features, AI integration, advanced automation, and industry-disrupting capabilities.
+**Focus**: **"Futuristic"** features, AI integration, advanced automation, and industry-disrupting capabilities.
+**Timeline**: Q4 / Future
 
-- [ ] **AI-Powered Dump Analysis**: Integrate with LLMs to automatically generate summaries of dumps, identify potential issues, and suggest refactorings.
-- [ ] **Interactive TUI Explorer**: A `create-dump explore` command that opens a Terminal UI to browse and search a dump file without extracting it.
-- [ ] **Direct-to-Archive Streaming**: A high-performance mode that writes directly to a compressed archive, bypassing intermediate files.
-- [ ] **Remote/Centralized Configuration**: Allow SRE teams to enforce a central configuration policy from a remote location (e.g., S3).
-- [ ] **GitHub App / PR Commenting Bot**: A GitHub App that automatically runs `create-dump` on pull requests and posts the dump as a comment.
+- [ ] **RAG-Ready Dumps (Vector Embeddings)**: Automatically generate and embed vector representations of the code alongside the dump for instant LLM ingestion.
+- [ ] **AI-Powered Dump Analysis**: Integrate with LLMs to automatically generate summaries, architectural insights, and "Code Health" reports.
+- [ ] **Interactive TUI Explorer**: A `create-dump explore` command launching a Terminal UI to browse/search a dump without extracting it.
+- [ ] **Direct-to-Archive Streaming**: High-performance mode writing directly to a compressed archive stream, bypassing disk I/O for massive repos.
+- [ ] **Centralized Config Policy**: Allow SRE teams to enforce a master configuration policy fetched from a remote URL.
+- [ ] **GitHub App / PR Bot**: A fully-fledged bot that listens to PR events and comments with a dump summary or "diff" analysis.
 
 ---
 
@@ -66,7 +73,8 @@ This is a visionary, integration-oriented plan that categorizes features from "C
 
 **Focus**: Wild, creative, experimental ideas that set the project apart.
 
-- [ ] **Code Archeology**: Analyze the git history of the dumped files to provide insights into code churn, authorship, and historical context.
-- [ ] **Dependency Tree Analysis**: Include a dependency graph (e.g., from `pipdeptree` or `npm ls`) in the dump.
-- [ ] **Terraform/IaC Integration**: A specialized mode for dumping infrastructure-as-code configurations with built-in validation and visualization.
-- [ ] **Jupyter Notebook Integration**: A magic command for Jupyter notebooks that can dump and restore notebook state.
+- [ ] **Code Archeology**: Analyze git history to visualize code churn, heatmaps of activity, and authorship evolution in the dump.
+- [ ] **Dependency Tree Analysis**: Generate and embed a visual dependency graph (pip/npm/cargo) within the Markdown dump.
+- [ ] **IaC / Terraform Mode**: Specialized dumping for Infrastructure-as-Code with built-in validation and resource visualization.
+- [ ] **Jupyter Notebook Integration**: "Magic" commands to snapshot and restore Jupyter notebook states effortlessly.
+- [ ] **Context-Aware Sampling**: Use static analysis to dump only the "Call Graph" relevant to a specific function or feature.
