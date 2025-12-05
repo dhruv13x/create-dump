@@ -45,7 +45,7 @@ def single(
     # ⚡ NEW: v8 feature flags
     watch: bool = typer.Option(False, "--watch", help="Run in live-watch mode, redumping on file changes."),
     git_ls_files: bool = typer.Option(False, "--git-ls-files", help="Use 'git ls-files' for file collection (fast, accurate)."),
-    diff_since: Optional[str] = typer.Option(None, "--diff-since", help="Only dump files changed since a specific git ref (e.g., 'main')."),
+    diff_since: Optional[str] = typer.Option(None, "--diff-since", help="Generate a git diff/patch file for changes since a specific git ref (e.g., 'main')."),
     scan_secrets: bool = typer.Option(False, "--scan-secrets", help="Scan files for secrets. Fails dump if secrets are found."),
     hide_secrets: bool = typer.Option(False, "--hide-secrets", help="Redact found secrets (requires --scan-secrets)."),
     secret_patterns: Optional[List[str]] = typer.Option(None, "--secret-patterns", help="Custom regex patterns for secret scanning."),

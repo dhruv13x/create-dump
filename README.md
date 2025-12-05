@@ -167,7 +167,7 @@ metrics_port = 8000
 | `--max-workers` | | Concurrency level. | `16` |
 | `--watch` | | Run in live-watch mode. | `false` |
 | `--git-ls-files` | | Use 'git ls-files' for file collection. | `false` |
-| `--diff-since` | | Only dump files changed since a specific git ref. | `null` |
+| `--diff-since` | | Generate a git diff/patch file for changes since a specific git ref. | `null` |
 | `--scan-secrets` | | Scan files for secrets. Fails dump if secrets are found. | `false` |
 | `--hide-secrets` | | Redact found secrets (requires --scan-secrets). | `false` |
 | `--secret-patterns` | | Custom regex patterns for secret scanning. | `null` |
@@ -258,8 +258,8 @@ metrics_port = 8000
 - [x] Secret Scanning & Redaction
 - [x] Rollback / Restore Capability
 - [x] Push Notifications (ntfy.sh)
+- [x] Differential Dumps (Git Diff)
 - [ ] Remote Storage Support (S3, GCS)
-- [ ] Differential Dumps (Git Diff) - *Partially Implemented*
 - [ ] PDF Export
 
 ---

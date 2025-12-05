@@ -25,7 +25,7 @@ from ..path_utils import safe_is_within
 from ..helpers import _unique_path
 from ..logging import logger, styled_print
 from ..metrics import DUMP_DURATION, metrics_server
-from ..system import get_git_meta
+from ..system import get_git_meta, get_git_diff_content
 from ..processor import FileProcessor, ProcessorMiddleware
 from ..writing import ChecksumWriter, MarkdownWriter, JsonWriter
 from ..scanning.secret import SecretScanner
@@ -214,7 +214,11 @@ class SingleRunOrchestrator:
             timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
             foldername = self.root.name or "project"
             
-            file_ext = "json" if self.format == "json" else "md"
+            if self.diff_since:
+                file_ext = "diff"
+            else:
+                file_ext = "json" if self.format == "json" else "md"
+
             branded_name = Path(f"{foldername}_all_create_dump_{timestamp}.{file_ext}")
 
             output_dest = self.root
@@ -270,38 +274,54 @@ class SingleRunOrchestrator:
                     # ⚡ FIX: Apply the label to the metric
                     with DUMP_DURATION.labels(collector=collector_label).time():
                         
-                        # ⚡ REFACTOR: Step 1 - Build middleware
-                        middlewares: List[ProcessorMiddleware] = []
-                        if effective_scan_secrets:
-                            middlewares.append(
-                                SecretScanner(
-                                    hide_secrets=effective_hide_secrets,
-                                    custom_patterns=combined_secret_patterns,
-                                )
-                            )
-                        if self.scan_todos:
-                            middlewares.append(TodoScanner())
-                        
-                        # ⚡ REFACTOR: Step 2 - Process files
-                        processor = FileProcessor(
-                            temp_dir.name,
-                            middlewares=middlewares, # Pass middleware list
-                        )
-                        processed_files = await processor.dump_concurrent(
-                            files_list, self.progress, self.max_workers
-                        )
-                        
-                        # Step 3 - Format output
-                        if self.format == "json":
-                            writer = JsonWriter(outfile)
-                            await writer.write(processed_files, gmeta, __version__, total_files=total_files, total_loc=total_loc)
+                        if self.diff_since:
+                            # ⚡ NEW: Git Diff Dump Mode
+                            logger.info("Generating git diff dump", ref=self.diff_since)
+                            diff_content = await get_git_diff_content(self.root, self.diff_since, files_list)
+
+                            async with await anyio.open_file(outfile, "w", encoding="utf-8") as f:
+                                await f.write(diff_content)
+
+                            # Fake processed files list for success summary (metrics might be slightly off)
+                            # Or we can leave it empty, but success_count uses it.
+                            # Let's populate it with dummy success entries for the files we diffed?
+                            # No, processed_files is List[DumpFile]. We don't have DumpFile objects here.
+                            # We can just skip processed_files population.
+
                         else:
-                            writer = MarkdownWriter(
-                                outfile, 
-                                self.no_toc, 
-                                self.tree_toc,
+                            # Standard Dump Mode
+                            # ⚡ REFACTOR: Step 1 - Build middleware
+                            middlewares: List[ProcessorMiddleware] = []
+                            if effective_scan_secrets:
+                                middlewares.append(
+                                    SecretScanner(
+                                        hide_secrets=effective_hide_secrets,
+                                        custom_patterns=combined_secret_patterns,
+                                    )
+                                )
+                            if self.scan_todos:
+                                middlewares.append(TodoScanner())
+
+                            # ⚡ REFACTOR: Step 2 - Process files
+                            processor = FileProcessor(
+                                temp_dir.name,
+                                middlewares=middlewares, # Pass middleware list
                             )
-                            await writer.write(processed_files, gmeta, __version__, total_files=total_files, total_loc=total_loc)
+                            processed_files = await processor.dump_concurrent(
+                                files_list, self.progress, self.max_workers
+                            )
+
+                            # Step 3 - Format output
+                            if self.format == "json":
+                                writer = JsonWriter(outfile)
+                                await writer.write(processed_files, gmeta, __version__, total_files=total_files, total_loc=total_loc)
+                            else:
+                                writer = MarkdownWriter(
+                                    outfile,
+                                    self.no_toc,
+                                    self.tree_toc,
+                                )
+                                await writer.write(processed_files, gmeta, __version__, total_files=total_files, total_loc=total_loc)
 
                 # Step 4 - Compress
                 if self.compress:
@@ -349,11 +369,18 @@ class SingleRunOrchestrator:
                         logger.info(msg)
 
                 # Final metrics
-                success_count = sum(1 for f in processed_files if not f.error)
+                if self.diff_since:
+                     # For diff mode, we assume success if we reached here
+                    success_count = len(files_list)
+                    error_count = 0
+                else:
+                    success_count = sum(1 for f in processed_files if not f.error)
+                    error_count = len(processed_files) - success_count
+
                 logger.info(
                     "Dump summary",
                     success=success_count,
-                    errors=len(processed_files) - success_count,
+                    errors=error_count,
                     output=str(outfile),
                 )
                 status_message = f"Successfully created: {outfile.name}"
