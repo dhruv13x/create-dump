@@ -269,7 +269,8 @@ class TestSingleCli:
             assert call_args[31] == "main"         # diff_since
             assert call_args[32] is True           # scan_secrets
             assert call_args[33] is True           # hide_secrets
-            assert call_args[34] is True           # scan_todos
+            assert call_args[34] is None           # secret_patterns
+            assert call_args[35] is True           # scan_todos
 
     def test_dry_run_exit_is_graceful(self, cli_runner: CliRunner, mock_cli_deps: dict):
         """
