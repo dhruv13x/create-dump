@@ -89,6 +89,22 @@ class DumpFile(BaseModel):
     todos: List[str] = Field(default_factory=list)
 
 
+def has_local_config(path: Path) -> bool:
+    """Checks if a directory has a local create-dump configuration file."""
+    if (path / ".create_dump.toml").exists() or (path / "create_dump.toml").exists():
+        return True
+
+    pyproj = path / "pyproject.toml"
+    if pyproj.exists():
+        try:
+            full_data = toml.load(pyproj)
+            if full_data.get("tool", {}).get("create-dump"):
+                return True
+        except Exception:
+            pass
+    return False
+
+
 # 🐞 FIX: Add `_cwd` parameter for testability
 def load_config(path: Optional[Path] = None, _cwd: Optional[Path] = None, profile: Optional[str] = None) -> Config:
     """Loads config from [tool.create-dump] in TOML files."""
