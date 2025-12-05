@@ -102,7 +102,7 @@ create-dump rollback --file ./dumps/my-snapshot.md
     Integrates `detect-secrets` to scan files during processing. Can fail the dump (`--scan-secrets`) or redact secrets in-place (`--hide-secrets`).
 
   * **Safety & Integrity**
-    SHA256 hashing for all dumps, atomic writes, async-safe path guards (prevents Zip-Slip & Path Traversal), and orphan quarantine.
+    SHA256 hashing for all dumps, atomic writes, async-safe path guards (prevents traversal & Zip-Slip), and orphan quarantine.
 
   * **Observability**
     Prometheus metrics (e.g., `create_dump_duration_seconds`, `create_dump_files_total`).
@@ -112,6 +112,9 @@ create-dump rollback --file ./dumps/my-snapshot.md
 
   * **Push Notifications**
     Get notified on dump completion via `ntfy.sh` push notifications (`--notify-topic <topic>`).
+
+  * **Dump Header Statistics**
+    Dump header includes total lines of code and file count for quick context.
 
 | Feature | Single Mode | Batch Mode |
 | :--- | :--- | :--- |
@@ -326,8 +329,8 @@ This creates a new directory like `./all_create_dump_rollbacks/my_project_dump/`
 │      │          │               │         │         │
 │      ▼          │               │         ▼         │
 │ (Process/Scan)  │               │   (Parse .md)     │
-│      │          │               │         │         │
-│      ▼          │               │         ▼         │
+│      │          │               │         ▼         │
+│      ▼          │               │   (Rehydrate Files) │
 │ (Write MD/JSON) │               │   (Rehydrate Files) │
 │      │          │               │                   │
 │      ▼          │               └───────────────────┘
