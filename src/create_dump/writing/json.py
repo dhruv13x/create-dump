@@ -54,9 +54,12 @@ class JsonWriter:
                     "content": None,
                     "todos": df.todos,
                 })
-            elif df.temp_path:
+            elif df.temp_path or df.content:
                 try:
-                    content = await self._read_temp_file(df.temp_path)
+                    content = df.content
+                    if not content and df.temp_path:
+                         content = await self._read_temp_file(df.temp_path)
+
                     data["files"].append({
                         "path": df.path,
                         "language": df.language,
@@ -65,11 +68,11 @@ class JsonWriter:
                         "todos": df.todos,
                     })
                 except Exception as e:
-                    logger.error("Failed to read temp file for JSON dump", path=df.path, error=str(e))
+                    logger.error("Failed to read content for JSON dump", path=df.path, error=str(e))
                     data["files"].append({
                         "path": df.path,
                         "language": df.language,
-                        "error": f"Failed to read temp file: {e}",
+                        "error": f"Failed to read content: {e}",
                         "content": None
                     })
 
