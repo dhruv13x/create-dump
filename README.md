@@ -45,6 +45,7 @@ Built for Python 3.11+, leveraging **AnyIO**, Pydantic, Typer, Rich, and Prometh
 ### Prerequisites
 - Python 3.11+
 - Git (optional, for metadata and `git ls-files` support)
+- PostgreSQL / MySQL client tools (optional, for database dumping)
 
 ### Installation
 
@@ -74,6 +75,12 @@ create-dump single --dest ./dumps/my-snapshot.md
 
 # Dump with Git file listing, watch mode, and secret redaction
 create-dump single --git-ls-files --watch --scan-secrets --hide-secrets
+```
+
+**Database Snapshotting:**
+```bash
+# Dump code AND a PostgreSQL database schema/data
+create-dump single --db-provider postgres --db-name mydb --db-user postgres --db-pass-env DB_PASSWORD
 ```
 
 **Batch Mode (Monorepos):**
@@ -106,10 +113,11 @@ archives/my-snapshot_20250101_121045.zip
 *   **Git-Native Collection**: Use `git ls-files` for fast, accurate file discovery (`--git-ls-files`) or dump only changed files (`--diff-since <ref>`).
 *   **Live Watch Mode & Smart Caching**: Run in a persistent state (`--watch`) that automatically re-runs the dump on any file change. Includes **Smart Caching** to avoid reprocessing unchanged files for blazing fast updates.
 *   **Secret Scanning**: Integrates `detect-secrets` to scan files during processing. Can fail the dump (`--scan-secrets`), redact secrets in-place (`--hide-secrets`), or use custom patterns (`--secret-patterns`).
+*   **Database Snapshotting**: Dump **PostgreSQL or MySQL** schemas and data alongside your code (`--db-provider`). Supports env-var password security (`--db-pass-env`).
+*   **ChatOps & Notifications**: Push notifications via **ntfy.sh, Slack, Discord, and Telegram** on dump completion.
 *   **Safety & Integrity**: SHA256 hashing for all dumps, atomic writes, async-safe path guards (prevents traversal & Zip-Slip), and orphan quarantine.
 *   **Observability**: Prometheus metrics (e.g., `create_dump_duration_seconds`, `create_dump_files_total`).
 *   **TODO/FIXME Scanning**: Scan for `TODO` or `FIXME` tags in code and append a summary to the dump (`--scan-todos`).
-*   **Push Notifications**: Get notified on dump completion via `ntfy.sh` push notifications (`--notify-topic <topic>`).
 
 | Feature | Single Mode | Batch Mode |
 | :--- | :--- | :--- |
@@ -117,6 +125,7 @@ archives/my-snapshot_20250101_121045.zip
 | **Archiving** | Optional | Enforced retention |
 | **Concurrency** | Up to **16** workers | Parallel subdirs |
 | **Git Metadata** | ✔️ | Per-subdir ✔️ |
+| **Database Dumps** | ✔️ | ❌ |
 
 ---
 
@@ -138,7 +147,7 @@ metrics_port = 8000
 # git_ls_files = true
 # scan_secrets = true
 # hide_secrets = true
-# notify_topic = "your_ntfy_topic"
+# notify_slack = "https://hooks.slack.com/services/..."
 ```
 
 ### CLI Arguments
@@ -172,7 +181,6 @@ metrics_port = 8000
 | `--hide-secrets` | | Redact found secrets (requires --scan-secrets). | `false` |
 | `--secret-patterns` | | Custom regex patterns for secret scanning. | `null` |
 | `--scan-todos` | | Scan files for TODO/FIXME tags and append a summary. | `false` |
-| `--notify-topic` | | ntfy.sh topic for push notification on completion. | `null` |
 | `--archive` | `-a` | Archive prior dumps into ZIP. | `false` |
 | `--archive-all` | | Archive dumps grouped by prefix. | `false` |
 | `--archive-search` | | Search project-wide for dumps. | `false` |
@@ -182,6 +190,20 @@ metrics_port = 8000
 | `--archive-keep-last` | | Keep last N archives. | `null` |
 | `--archive-clean-root` | | Clean root post-archive. | `false` |
 | `--archive-format` | | Archive format (zip, tar.gz, tar.bz2). | `zip` |
+| **ChatOps** | | | |
+| `--notify-topic` | | ntfy.sh topic for push notification. | `null` |
+| `--notify-slack` | | Slack webhook URL. | `null` |
+| `--notify-discord` | | Discord webhook URL. | `null` |
+| `--notify-telegram-chat` | | Telegram chat ID. | `null` |
+| `--notify-telegram-token` | | Telegram bot token. | `null` |
+| **Database** | | | |
+| `--db-provider` | | Database provider (postgres, mysql). | `null` |
+| `--db-name` | | Database name. | `null` |
+| `--db-host` | | Database host. | `localhost` |
+| `--db-port` | | Database port. | `null` |
+| `--db-user` | | Database user. | `null` |
+| `--db-pass-env` | | Env var containing database password. | `null` |
+| **Controls** | | | |
 | `--yes` | `-y` | Assume yes for prompts and deletions. | `false` |
 | `--dry-run` | `-d` | Simulate without writing files. | `false` |
 | `--no-dry-run` | `-nd` | Run for real (disables simulation). | `false` |
@@ -239,6 +261,9 @@ metrics_port = 8000
 │      │          │               │                   │
 │      ▼          │               └───────────────────┘
 │ (Archive/Prune) │
+│      │          │
+│      ▼          │
+│(Notify/Database)│
 └─────────────────┘
 ```
 
@@ -247,6 +272,7 @@ metrics_port = 8000
 - **Processor**: Reads files, detects binary content, scans for secrets/todos.
 - **Writer**: Generates the Markdown or JSON output with TOC and headers.
 - **Archiver**: Manages retention policies and compression of old dumps.
+- **DatabaseDumper**: Connects to DBs (Postgres/MySQL) and dumps schemas/data.
 - **Rollback Engine**: Parses dump files and reconstructs the file system safely.
 
 ---
@@ -257,7 +283,8 @@ metrics_port = 8000
 - [x] Git Metadata & `ls-files` Integration
 - [x] Secret Scanning & Redaction
 - [x] Rollback / Restore Capability
-- [x] Push Notifications (ntfy.sh)
+- [x] Multi-Channel Notifications (Slack, Discord, Telegram, ntfy)
+- [x] Database Dumping (Postgres/MySQL)
 - [x] Differential Dumps (Git Diff)
 - [ ] Remote Storage Support (S3, GCS)
 - [ ] PDF Export
