@@ -52,6 +52,20 @@ def single(
     scan_todos: bool = typer.Option(False, "--scan-todos", help="Scan files for TODO/FIXME tags and append a summary."),
     notify_topic: Optional[str] = typer.Option(None, "--notify-topic", help="ntfy.sh topic for push notification on completion."),
 
+    # ⚡ NEW: ChatOps Flags
+    notify_slack: Optional[str] = typer.Option(None, "--notify-slack", help="Slack webhook URL."),
+    notify_discord: Optional[str] = typer.Option(None, "--notify-discord", help="Discord webhook URL."),
+    notify_telegram_chat: Optional[str] = typer.Option(None, "--notify-telegram-chat", help="Telegram chat ID."),
+    notify_telegram_token: Optional[str] = typer.Option(None, "--notify-telegram-token", help="Telegram bot token."),
+
+    # ⚡ NEW: Database Dump Flags
+    db_provider: Optional[str] = typer.Option(None, "--db-provider", help="Database provider (postgres, mysql)."),
+    db_name: Optional[str] = typer.Option(None, "--db-name", help="Database name."),
+    db_host: str = typer.Option("localhost", "--db-host", help="Database host [default: localhost]."),
+    db_port: Optional[int] = typer.Option(None, "--db-port", help="Database port."),
+    db_user: Optional[str] = typer.Option(None, "--db-user", help="Database user."),
+    db_pass_env: Optional[str] = typer.Option(None, "--db-pass-env", help="Env var containing database password."),
+
     # Archiving (Unified)
     archive: bool = typer.Option(False, "-a", "--archive", help="Archive prior dumps into ZIP (unified workflow)."),
     archive_all: bool = typer.Option(False, "--archive-all", help="Archive dumps grouped by prefix (e.g., src_, tests_) into separate ZIPs."),
@@ -159,6 +173,16 @@ def single(
             secret_patterns,
             scan_todos,
             notify_topic,
+            notify_slack,
+            notify_discord,
+            notify_telegram_chat,
+            notify_telegram_token,
+            db_provider,
+            db_name,
+            db_host,
+            db_port,
+            db_user,
+            db_pass_env,
         )
     except Exit as e:
         if getattr(e, "exit_code", None) == 0 and dry_run:

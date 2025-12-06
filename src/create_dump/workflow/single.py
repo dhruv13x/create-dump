@@ -31,8 +31,14 @@ from ..processor import FileProcessor, ProcessorMiddleware
 from ..writing import ChecksumWriter, MarkdownWriter, JsonWriter
 from ..scanning.secret import SecretScanner
 from ..scanning.todo import TodoScanner
-from ..notifications import send_ntfy_notification
+from ..notifications import (
+    send_ntfy_notification,
+    send_slack_notification,
+    send_discord_notification,
+    send_telegram_notification,
+)
 from ..caching import CacheManager # ⚡ IMPORT CacheManager
+from ..database import DatabaseDumper # ⚡ IMPORT DatabaseDumper
 
 try:
     __version__ = metadata.version("create-dump")
@@ -81,6 +87,18 @@ class SingleRunOrchestrator:
         secret_patterns: Optional[List[str]] = None,
         scan_todos: bool = False,
         notify_topic: Optional[str] = None,
+        # ⚡ NEW: ChatOps flags
+        notify_slack: Optional[str] = None,
+        notify_discord: Optional[str] = None,
+        notify_telegram_chat: Optional[str] = None,
+        notify_telegram_token: Optional[str] = None,
+        # ⚡ NEW: Database flags
+        db_provider: Optional[str] = None,
+        db_name: Optional[str] = None,
+        db_host: str = "localhost",
+        db_port: Optional[int] = None,
+        db_user: Optional[str] = None,
+        db_pass_env: Optional[str] = None,
         watch: bool = False, # Pass watch explicitly
     ):
         # Store all parameters as instance attributes
@@ -119,6 +137,16 @@ class SingleRunOrchestrator:
         self.secret_patterns = secret_patterns or []
         self.scan_todos = scan_todos
         self.notify_topic = notify_topic
+        self.notify_slack = notify_slack
+        self.notify_discord = notify_discord
+        self.notify_telegram_chat = notify_telegram_chat
+        self.notify_telegram_token = notify_telegram_token
+        self.db_provider = db_provider
+        self.db_name = db_name
+        self.db_host = db_host
+        self.db_port = db_port
+        self.db_user = db_user
+        self.db_pass_env = db_pass_env
         
         # ⚡ REFACTOR: Store anyio.Path version of root
         self.anyio_root = anyio.Path(self.root)
@@ -347,6 +375,30 @@ class SingleRunOrchestrator:
                                 files_list, self.progress, self.max_workers
                             )
 
+                            # ⚡ NEW: Database Dump Integration
+                            if self.db_provider and self.db_name:
+                                try:
+                                    dumper = DatabaseDumper(
+                                        provider=self.db_provider,
+                                        db_name=self.db_name,
+                                        host=self.db_host,
+                                        port=self.db_port,
+                                        user=self.db_user,
+                                        password_env=self.db_pass_env,
+                                    )
+                                    db_file = await dumper.dump()
+                                    processed_files.append(db_file)
+                                    if not self.quiet:
+                                        styled_print(f"[green]✔ Database dump added: {db_file.path}[/green]")
+                                except Exception as e:
+                                    logger.error("Database dump failed", error=str(e))
+                                    if not self.quiet:
+                                        styled_print(f"[red]❌ Database dump failed: {e}[/red]")
+                                    # We don't fail the whole dump, just log error?
+                                    # Or should we fail? Roadmap doesn't say.
+                                    # Let's treat it as an error file.
+                                    processed_files.append(DumpFile(path="database_dump_error", error=f"Database dump failed: {str(e)}"))
+
                             # ⚡ CACHE UPDATE: Save metadata if caching is enabled
                             if self.cache_manager:
                                 await self.cache_manager.save()
@@ -439,9 +491,16 @@ class SingleRunOrchestrator:
             status_message = f"An unexpected error occurred: {str(e)}"
             raise e
         finally:
-            if self.notify_topic:
-                await send_ntfy_notification(
-                    self.notify_topic,
-                    message=status_message,
-                    title=status_title,
-                )
+            # ⚡ NOTIFICATIONS: Send all configured notifications
+            async with anyio.create_task_group() as tg:
+                if self.notify_topic:
+                    tg.start_soon(send_ntfy_notification, self.notify_topic, status_message, status_title)
+
+                if self.notify_slack:
+                    tg.start_soon(send_slack_notification, self.notify_slack, f"{status_title}\n{status_message}")
+
+                if self.notify_discord:
+                    tg.start_soon(send_discord_notification, self.notify_discord, f"{status_title}\n{status_message}")
+
+                if self.notify_telegram_chat and self.notify_telegram_token:
+                    tg.start_soon(send_telegram_notification, self.notify_telegram_chat, self.notify_telegram_token, f"{status_title}\n{status_message}")

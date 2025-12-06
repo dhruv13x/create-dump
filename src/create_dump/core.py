@@ -85,6 +85,8 @@ class DumpFile(BaseModel):
     path: str
     language: Optional[str] = None
     temp_path: Optional[Path] = None
+    # ⚡ NEW: Support in-memory content for generated files (like DB dumps)
+    content: Optional[str] = None
     error: Optional[str] = None
     todos: List[str] = Field(default_factory=list)
 

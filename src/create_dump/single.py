@@ -60,6 +60,18 @@ async def run_single(
     secret_patterns: Optional[List[str]] = None,
     scan_todos: bool = False,
     notify_topic: Optional[str] = None,
+    # ⚡ NEW: ChatOps flags
+    notify_slack: Optional[str] = None,
+    notify_discord: Optional[str] = None,
+    notify_telegram_chat: Optional[str] = None,
+    notify_telegram_token: Optional[str] = None,
+    # ⚡ NEW: Database flags
+    db_provider: Optional[str] = None,
+    db_name: Optional[str] = None,
+    db_host: str = "localhost",
+    db_port: Optional[int] = None,
+    db_user: Optional[str] = None,
+    db_pass_env: Optional[str] = None,
 ) -> None:
     
     root = root.resolve()
@@ -110,6 +122,16 @@ async def run_single(
         secret_patterns=secret_patterns,
         scan_todos=scan_todos,
         notify_topic=notify_topic,
+        notify_slack=notify_slack,
+        notify_discord=notify_discord,
+        notify_telegram_chat=notify_telegram_chat,
+        notify_telegram_token=notify_telegram_token,
+        db_provider=db_provider,
+        db_name=db_name,
+        db_host=db_host,
+        db_port=db_port,
+        db_user=db_user,
+        db_pass_env=db_pass_env,
     )
 
     # ⚡ REFACTOR: Top-level control flow

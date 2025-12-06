@@ -82,7 +82,7 @@ class MarkdownWriter:
                 if not self.no_toc:
                     await out.write("## Table of Contents\n\n")
                     
-                    valid_files = [df for df in self.files if not df.error and df.temp_path]
+                    valid_files = [df for df in self.files if not df.error and (df.temp_path or df.content)]
                     
                     if self.tree_toc:
                         file_tree: Dict[str, Any] = {}
@@ -106,12 +106,18 @@ class MarkdownWriter:
                         await out.write(
                             f"## {df.path}\n\n> ⚠️ **Failed:** {df.error}\n\n---\n\n"
                         )
-                    elif df.temp_path:
+                    elif df.temp_path or df.content:
                         lang = get_language(df.path)
                         has_backtick = False  # Check content for backticks
                         
-                        # Read temp file to check for backticks
-                        temp_content = await anyio.Path(df.temp_path).read_text(encoding="utf-8", errors="replace")
+                        if df.content:
+                            temp_content = df.content
+                        elif df.temp_path:
+                             # Read temp file to check for backticks
+                            temp_content = await anyio.Path(df.temp_path).read_text(encoding="utf-8", errors="replace")
+                        else:
+                            temp_content = ""
+
                         if "```" in temp_content:
                             has_backtick = True
                         
