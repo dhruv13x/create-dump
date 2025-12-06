@@ -114,6 +114,9 @@ async def run_single(
 
     # ⚡ REFACTOR: Top-level control flow
     if watch:
+        # ⚡ SMART CACHING: Enable caching for watch mode
+        orchestrator.enable_caching()
+
         if not quiet:
             styled_print("[green]Running initial dump...[/green]")
         

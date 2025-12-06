@@ -104,7 +104,7 @@ archives/my-snapshot_20250101_121045.zip
 *   **Flexible Archiving**: Automatically archive old dumps into **ZIP, tar.gz, or tar.bz2** formats. Includes integrity validation and retention policies (e.g., "keep last N").
 *   **Project Rollback & Restore**: Includes a `rollback` command to rehydrate a full project structure from a `.md` dump file, with SHA256 integrity verification.
 *   **Git-Native Collection**: Use `git ls-files` for fast, accurate file discovery (`--git-ls-files`) or dump only changed files (`--diff-since <ref>`).
-*   **Live Watch Mode**: Run in a persistent state (`--watch`) that automatically re-runs the dump on any file change, perfect for live development.
+*   **Live Watch Mode & Smart Caching**: Run in a persistent state (`--watch`) that automatically re-runs the dump on any file change. Includes **Smart Caching** to avoid reprocessing unchanged files for blazing fast updates.
 *   **Secret Scanning**: Integrates `detect-secrets` to scan files during processing. Can fail the dump (`--scan-secrets`), redact secrets in-place (`--hide-secrets`), or use custom patterns (`--secret-patterns`).
 *   **Safety & Integrity**: SHA256 hashing for all dumps, atomic writes, async-safe path guards (prevents traversal & Zip-Slip), and orphan quarantine.
 *   **Observability**: Prometheus metrics (e.g., `create_dump_duration_seconds`, `create_dump_files_total`).
