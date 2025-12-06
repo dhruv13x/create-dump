@@ -169,7 +169,7 @@ async def test_json_writer_read_temp_file_error(
     
     # Check logger
     mock_logger_error.assert_called_once_with(
-        "Failed to read temp file for JSON dump", 
+        "Failed to read content for JSON dump",
         path="src/fails.py", 
         error="Simulated read error"
     )

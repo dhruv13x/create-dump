@@ -563,8 +563,8 @@ class TestSingleRunOrchestrator:
 
         mock_send_ntfy.assert_called_once_with(
             "test",
-            message=ANY,
-            title="✅ create-dump Success",
+            ANY,
+            "✅ create-dump Success",
         )
 
 
@@ -586,8 +586,8 @@ class TestSingleRunOrchestrator:
 
         mock_send_ntfy.assert_called_once_with(
             "test",
-            message="An unexpected error occurred: BOOM",
-            title="❌ create-dump Error",
+            "An unexpected error occurred: BOOM",
+            "❌ create-dump Error",
         )
 
 
@@ -606,8 +606,8 @@ class TestSingleRunOrchestrator:
 
         mock_send_ntfy.assert_called_once_with(
             "test",
-            message="Dry run completed.",
-            title="ℹ️ create-dump Dry Run",
+            "Dry run completed.",
+            "ℹ️ create-dump Dry Run",
         )
 
 
