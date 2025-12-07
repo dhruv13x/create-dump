@@ -40,265 +40,187 @@ Built for Python 3.11+, leveraging **AnyIO**, Pydantic, Typer, Rich, and Prometh
 
 ---
 
-## 🚀 Quick Start
+## ⚡ Quick Start
 
 ### Prerequisites
-- Python 3.11+
-- Git (optional, for metadata and `git ls-files` support)
-- PostgreSQL / MySQL client tools (optional, for database dumping)
+- **Python**: 3.11 or higher
+- **Git**: Optional, but recommended for metadata and `git ls-files` support.
+- **Docker/Podman**: Optional, if running via container.
 
 ### Installation
 
-**PyPI (Recommended):**
+**Via PyPI:**
 ```bash
 pip install create-dump
 ```
 
-**From Source:**
+**Via Source (Dev):**
 ```bash
 git clone https://github.com/dhruv13x/create-dump.git
 cd create-dump
 pip install -e .[dev]
 ```
 
-### Usage Examples
+### Run (The "Hello World")
+Navigate to your project root and run:
 
-**Interactive Setup (Recommended for first-time users):**
 ```bash
-create-dump --init
+create-dump
 ```
+*This creates a markdown snapshot of your current directory in `create_dump_output/` (or root).*
 
-**Single Mode (Default):**
+### Demo Snippet
+Copy-paste this to see it in action:
+
 ```bash
-# Dump current directory to a markdown file
-create-dump single --dest ./dumps/my-snapshot.md
+# 1. Install
+pip install create-dump
 
-# Dump with Git file listing, watch mode, and secret redaction
-create-dump single --git-ls-files --watch --scan-secrets --hide-secrets
-```
+# 2. Dump your current folder (excluding hidden files)
+create-dump single --use-gitignore --no-toc
 
-**Database Snapshotting:**
-```bash
-# Dump code AND a PostgreSQL database schema/data
-create-dump single --db-provider postgres --db-name mydb --db-user postgres --db-pass-env DB_PASSWORD
-```
-
-**Batch Mode (Monorepos):**
-```bash
-# Dump specific directories (src, tests) and keep only the last 5 dumps
-create-dump batch run --root ./monorepo --dirs src,tests --archive --keep-last 5
-```
-
-**Rollback & Restore:**
-```bash
-# Restore project from a dump file
-create-dump rollback --file ./dumps/my-snapshot.md
-```
-
-**Output Example:**
-```text
-dumps/my-snapshot_all_create_dump_20250101_121045.md
-dumps/my-snapshot_all_create_dump_20250101_121045.md.sha256
-archives/my-snapshot_20250101_121045.zip
+# 3. View the result
+head -n 20 *_all_create_dump_*.md
 ```
 
 ---
 
-## ✨ Key Features
+## ✨ Features
 
-*   **Branded Markdown Generation**: Auto TOC (list or tree), language-detected code blocks, Git metadata, timestamps.
-*   **Async-First & Concurrent**: Built on `anyio` for high-throughput, non-blocking I/O. Parallel file processing (16+ workers), timeouts, and progress bars (Rich).
-*   **Flexible Archiving**: Automatically archive old dumps into **ZIP, tar.gz, or tar.bz2** formats. Includes integrity validation and retention policies (e.g., "keep last N").
-*   **Project Rollback & Restore**: Includes a `rollback` command to rehydrate a full project structure from a `.md` dump file, with SHA256 integrity verification.
-*   **Git-Native Collection**: Use `git ls-files` for fast, accurate file discovery (`--git-ls-files`) or dump only changed files (`--diff-since <ref>`).
-*   **Live Watch Mode & Smart Caching**: Run in a persistent state (`--watch`) that automatically re-runs the dump on any file change. Includes **Smart Caching** to avoid reprocessing unchanged files for blazing fast updates.
-*   **Secret Scanning**: Integrates `detect-secrets` to scan files during processing. Can fail the dump (`--scan-secrets`), redact secrets in-place (`--hide-secrets`), or use custom patterns (`--secret-patterns`).
-*   **Database Snapshotting**: Dump **PostgreSQL or MySQL** schemas and data alongside your code (`--db-provider`). Supports env-var password security (`--db-pass-env`).
-*   **ChatOps & Notifications**: Push notifications via **ntfy.sh, Slack, Discord, and Telegram** on dump completion.
-*   **Safety & Integrity**: SHA256 hashing for all dumps, atomic writes, async-safe path guards (prevents traversal & Zip-Slip), and orphan quarantine.
-*   **Observability**: Prometheus metrics (e.g., `create_dump_duration_seconds`, `create_dump_files_total`).
-*   **TODO/FIXME Scanning**: Scan for `TODO` or `FIXME` tags in code and append a summary to the dump (`--scan-todos`).
+### Core
+-   **Branded Markdown**: Auto-generated TOC (list or tree), language detection, and metadata headers.
+-   **Smart Collection**: Respects `.gitignore` automatically. Use `--git-ls-files` for blazing fast, Git-native file discovery.
+-   **Multi-Mode**:
+    -   `single`: Dump one project/directory.
+    -   `batch`: Recursively dump multiple subprojects in a monorepo.
+    -   `rollback`: Restore a project from a dump file.
+-   **Live Watch**: Run with `--watch` to auto-update the dump whenever files change.
 
-| Feature | Single Mode | Batch Mode |
-| :--- | :--- | :--- |
-| **Scope** | Current dir/files | Recursive subdirs |
-| **Archiving** | Optional | Enforced retention |
-| **Concurrency** | Up to **16** workers | Parallel subdirs |
-| **Git Metadata** | ✔️ | Per-subdir ✔️ |
-| **Database Dumps** | ✔️ | ❌ |
+### Performance
+-   **Async & Concurrent**: Powered by `anyio` with up to 16 parallel workers for massive speedups on large repos.
+-   **Smart Caching**: Hashes config and file metadata to skip processing unchanged files.
+-   **Low Footprint**: Optimized for CI/CD pipelines.
+
+### Security & SRE
+-   **Secret Scanning**: Integrated `detect-secrets` scanning.
+    -   Fail on secret detection: `--scan-secrets`
+    -   Auto-redact secrets: `--hide-secrets`
+-   **Safe Paths**: Anti-traversal guards to prevent Zip-Slip attacks.
+-   **Observability**: Prometheus metrics server (default port 8000) and structured JSON logging.
+-   **ChatOps**: Native push notifications to Slack, Discord, Telegram, and ntfy.sh.
 
 ---
 
-## ⚙️ Configuration & Advanced Usage
+## 🛠️ Configuration
 
-### Environment Variables & Config File
-You can configure `create-dump` using a `create_dump.toml` file or `pyproject.toml`.
+You can configure `create-dump` via **CLI arguments**, **Environment Variables** (loaded into config), or a **TOML file** (`create_dump.toml` or `pyproject.toml`).
 
-**Example `pyproject.toml`:**
-```toml
-[tool.create-dump]
-dest = "/path/to/dumps"
-use_gitignore = true
-git_meta = true
-max_file_size_kb = 5000
-dump_pattern = ".*_all_create_dump_\\d{8}_\\d{6}\\.(md(\\.gz)?|sha256)$"
-excluded_dirs = ["__pycache__", ".git", ".venv", "node_modules"]
-metrics_port = 8000
-# git_ls_files = true
-# scan_secrets = true
-# hide_secrets = true
-# notify_slack = "https://hooks.slack.com/services/..."
-```
+### Environment Variables & TOML Keys
+*Define these in `[tool.create-dump]` section of `pyproject.toml` or `create_dump.toml`.*
 
-### CLI Arguments
-
-#### Main / Single Mode (`create-dump single`)
-
-| Argument | Shorthand | Description | Default |
+| Key | Type | Description | Default |
 | :--- | :--- | :--- | :--- |
-| `--version` | `-V` | Show version and exit. | `false` |
-| `--init` | | Run interactive wizard to create `create_dump.toml`. | `false` |
-| `--config` | | Path to TOML config file. | `null` |
-| `--profile` | | Config profile to merge from `pyproject.toml`. | `null` |
-| `--dest` | | Destination dir for output. | `.` |
-| `--no-toc` | | Omit table of contents. | `false` |
-| `--tree-toc` | | Render Table of Contents as a file tree. | `false` |
-| `--format` | | Output format (md or json). | `md` |
-| `--compress` | `-c` | Gzip the output file. | `false` |
-| `--progress` / `--no-progress` | `-p` | Show processing progress. | `true` |
-| `--allow-empty` | | Succeed on 0 files. | `false` |
-| `--metrics-port` | | Prometheus export port. | `8000` |
-| `--exclude` | | Comma-separated exclude patterns. | `""` |
-| `--include` | | Comma-separated include patterns. | `""` |
-| `--max-file-size` | | Max file size in KB. | `null` |
-| `--use-gitignore` / `--no-use-gitignore` | | Incorporate .gitignore excludes. | `true` |
-| `--git-meta` / `--no-git-meta` | | Include Git branch/commit. | `true` |
-| `--max-workers` | | Concurrency level. | `16` |
-| `--watch` | | Run in live-watch mode. | `false` |
-| `--git-ls-files` | | Use 'git ls-files' for file collection. | `false` |
-| `--diff-since` | | Generate a git diff/patch file for changes since a specific git ref. | `null` |
-| `--scan-secrets` | | Scan files for secrets. Fails dump if secrets are found. | `false` |
-| `--hide-secrets` | | Redact found secrets (requires --scan-secrets). | `false` |
-| `--secret-patterns` | | Custom regex patterns for secret scanning. | `null` |
-| `--scan-todos` | | Scan files for TODO/FIXME tags and append a summary. | `false` |
-| `--archive` | `-a` | Archive prior dumps into ZIP. | `false` |
-| `--archive-all` | | Archive dumps grouped by prefix. | `false` |
-| `--archive-search` | | Search project-wide for dumps. | `false` |
-| `--archive-include-current` / `--no-archive-include-current` | | Include this run in archive. | `true` |
-| `--archive-no-remove` | | Preserve originals post-archiving. | `false` |
-| `--archive-keep-latest` / `--no-archive-keep-latest` | | Keep latest dump live or archive all. | `true` |
-| `--archive-keep-last` | | Keep last N archives. | `null` |
-| `--archive-clean-root` | | Clean root post-archive. | `false` |
-| `--archive-format` | | Archive format (zip, tar.gz, tar.bz2). | `zip` |
-| **ChatOps** | | | |
-| `--notify-topic` | | ntfy.sh topic for push notification. | `null` |
-| `--notify-slack` | | Slack webhook URL. | `null` |
-| `--notify-discord` | | Discord webhook URL. | `null` |
-| `--notify-telegram-chat` | | Telegram chat ID. | `null` |
-| `--notify-telegram-token` | | Telegram bot token. | `null` |
-| **Database** | | | |
-| `--db-provider` | | Database provider (postgres, mysql). | `null` |
-| `--db-name` | | Database name. | `null` |
-| `--db-host` | | Database host. | `localhost` |
-| `--db-port` | | Database port. | `null` |
-| `--db-user` | | Database user. | `null` |
-| `--db-pass-env` | | Env var containing database password. | `null` |
-| **Controls** | | | |
-| `--yes` | `-y` | Assume yes for prompts and deletions. | `false` |
-| `--dry-run` | `-d` | Simulate without writing files. | `false` |
-| `--no-dry-run` | `-nd` | Run for real (disables simulation). | `false` |
-| `--verbose` | `-v` | Enable debug logging. | `false` |
-| `--quiet` | `-q` | Suppress output (CI mode). | `false` |
+| `dest` | Path | Default output destination. | `.` |
+| `use_gitignore` | Bool | Exclude files listed in `.gitignore`. | `true` |
+| `git_meta` | Bool | Include Branch/Commit hash in header. | `true` |
+| `max_file_size_kb` | Int | Skip files larger than this KB. | `5000` |
+| `excluded_dirs` | List | Directories to always ignore (e.g., `.git`, `node_modules`). | `[...]` |
+| `metrics_port` | Int | Port for Prometheus metrics. | `8000` |
+| `git_ls_files` | Bool | Use Git index for file list. | `false` |
+| `scan_secrets` | Bool | Enable secret scanning. | `false` |
+| `hide_secrets` | Bool | Redact secrets if found. | `false` |
 
-#### Batch Mode (`create-dump batch run`)
-*Runs dumps across subdirectories.*
+### CLI Arguments (`create-dump single`)
 
-| Argument | Description | Default |
+| Flag | Shorthand | Description |
 | :--- | :--- | :--- |
-| `root` | Root project path. | `.` |
-| `--dirs` | Subdirectories to process (comma-separated). | `.,packages,services` |
-| `--pattern` | Regex to identify dump files. | (Canonical Pattern) |
-| `--archive-all` | Archive dumps grouped by prefix into separate ZIPs. | `false` |
-| `--archive-keep-last` | Keep last N archives. | `null` |
-| `--max-workers` | Workers per subdir dump. | `4` |
+| `--dest <path>` | | Output directory. |
+| `--watch` | | Enable live-watch mode. |
+| `--git-ls-files` | | Use `git ls-files` (fastest collection). |
+| `--diff-since <ref>` | | Dump only files changed since Git ref. |
+| `--scan-secrets` | | Enable secret detection. |
+| `--hide-secrets` | | Redact detected secrets (requires scan). |
+| `--secret-patterns` | | Add custom regex patterns for secrets. |
+| `--scan-todos` | | Extract TODO/FIXME comments into summary. |
+| `--archive` | `-a` | Compress previous dumps into ZIP. |
+| `--compress` | `-c` | Gzip the output `.md.gz`. |
+| `--format <fmt>` | | Output format (`md` or `json`). |
+| `--db-provider <type>` | | Dump DB (`postgres`, `mysql`) alongside code. |
+| `--db-host <host>` | | Database host (default: localhost). |
+| `--db-port <port>` | | Database port. |
+| `--db-user <user>` | | Database user. |
+| `--db-pass-env <var>` | | Env var name containing DB password. |
+| `--notify-slack <url>` | | Send webhook on completion. |
+| `--dry-run` | `-d` | Simulate without writing files. |
 
-#### Rollback (`create-dump rollback`)
-*Rehydrates a project from a dump file.*
-
-| Argument | Description |
-| :--- | :--- |
-| `root` | Project root to scan for dumps and write rollback to. |
-| `--file` | Specify a dump file to use (e.g., `my_dump.md`). |
+*Run `create-dump --help` for the full list.*
 
 ---
 
 ## 🏗️ Architecture
 
+### Directory Tree
 ```
-┌─────────────────┐
-│   CLI (Typer)   │
-│ (single, batch, │
-│  init, rollback)│
-└────────┬────────┘
-         │
-┌────────▼────────┐
-│ Config / Models │
-│    (core.py)    │
-└─────────────────┘
-         │
-┌─────────────────┴─────────────────┐
-│                                   │
-▼                                   ▼
-┌─────────────────┐               ┌───────────────────┐
-│   DUMP FLOW     │               │   RESTORE FLOW    │
-│ (Collect)       │               │   (Verify SHA256) │
-│      │          │               │         │         │
-│      ▼          │               │         ▼         │
-│ (Process/Scan)  │               │   (Parse .md)     │
-│      │          │               │         ▼         │
-│      ▼          │               │   (Rehydrate Files) │
-│ (Write MD/JSON) │               │   (Rehydrate Files) │
-│      │          │               │                   │
-│      ▼          │               └───────────────────┘
-│ (Archive/Prune) │
-│      │          │
-│      ▼          │
-│(Notify/Database)│
-└─────────────────┘
+src/create_dump/
+├── cli/             # Entry points (main, single, batch)
+├── scanning/        # Secret scanning & security
+├── collector/       # File gathering (glob/git)
+├── workflow/        # Processing pipelines
+├── writing/         # Output generation (MD/JSON)
+├── archive/         # Compression & retention
+├── rollback/        # Restore functionality
+└── core.py          # Config & Models
 ```
 
-**Core Components:**
-- **Collector**: Gathers files using glob patterns or `git ls-files`.
-- **Processor**: Reads files, detects binary content, scans for secrets/todos.
-- **Writer**: Generates the Markdown or JSON output with TOC and headers.
-- **Archiver**: Manages retention policies and compression of old dumps.
-- **DatabaseDumper**: Connects to DBs (Postgres/MySQL) and dumps schemas/data.
-- **Rollback Engine**: Parses dump files and reconstructs the file system safely.
+### Data Flow
+1.  **CLI Entry**: User invokes `create-dump` (via Typer).
+2.  **Config Load**: Merges defaults, `pyproject.toml`, and CLI args.
+3.  **Collector**: Finds files via `glob` or `git ls-files`. Applies ignores.
+4.  **Processor (Async)**:
+    -   Reads file content.
+    -   **Middlewares**: Secret Scan -> TODO Scan -> Language Detect.
+5.  **Writer**: Aggregates processed files into a Markdown/JSON artifact.
+6.  **Post-Process**:
+    -   **Archiver**: Rotates old dumps.
+    -   **Notifier**: Sends Slack/Discord alerts.
 
 ---
 
-## 🗺️ Roadmap
+## 🐞 Troubleshooting
 
-- [x] Single & Batch Dumps
-- [x] Git Metadata & `ls-files` Integration
-- [x] Secret Scanning & Redaction
-- [x] Rollback / Restore Capability
-- [x] Multi-Channel Notifications (Slack, Discord, Telegram, ntfy)
-- [x] Database Dumping (Postgres/MySQL)
-- [x] Differential Dumps (Git Diff)
-- [ ] Remote Storage Support (S3, GCS)
-- [ ] PDF Export
+| Error Message | Possible Cause | Solution |
+| :--- | :--- | :--- |
+| `No matching files found` | `.gitignore` or exclude patterns are too aggressive. | Check patterns or run with `--no-use-gitignore`. |
+| `RecursionError` | Deeply nested directory or symlink loop. | Use `--exclude` on the problematic path. |
+| `Secret detected in ...` | Code contains an API key/password. | Rotate the key! Or use `--hide-secrets` / `--secret-patterns` to ignore/redact. |
+| `git ls-files failed` | Not inside a Git repository. | Run `git init` or don't use `--git-ls-files`. |
+| `DB connection failed` | Wrong credentials or host unreachable. | Check `--db-host`, `--db-port`, and `--db-pass-env`. |
+
+**Debug Mode**:
+Run with `-v` or `--verbose` to see detailed logs and stack traces.
+```bash
+create-dump single -v
+```
 
 ---
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see the [Contributing Guide](CONTRIBUTING.md) (if available) or follow these steps:
+We love contributions! Please check our [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
-1.  Fork the repo.
-2.  Create a feature branch.
-3.  Install dev dependencies: `pip install -e .[dev]`
-4.  Run tests: `pytest`
-5.  Submit a Pull Request.
+**Dev Setup**:
+1.  **Clone**: `git clone ...`
+2.  **Install**: `pip install -e .[dev]`
+3.  **Test**: `pytest`
+4.  **Lint**: `ruff check .`
 
-**License**: MIT
+---
+
+## 🗺️ Roadmap
+
+- [x] **Smart Caching**: Re-use processing for unchanged files.
+- [x] **Rollback Command**: Restore projects from dumps.
+- [x] **Database Dumps**: Postgres/MySQL integration.
+- [ ] **S3/Cloud Upload**: Direct upload of dumps/archives.
+- [ ] **PDF Export**: Generate PDF reports instead of Markdown.
+- [ ] **Plugin System**: Allow custom middleware via Python entrypoints.
