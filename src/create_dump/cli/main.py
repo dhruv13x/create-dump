@@ -22,9 +22,10 @@ from ..logging import setup_logging, styled_print
 # ⚡ REFACTOR: Import commands and command groups from submodules
 from .single import single
 from .batch import batch_app
-# ✨ NEW: Import the rollback function directly
-from ..banner import print_logo
+
 from .rollback import rollback
+
+from ..banner import print_logo
 
 print_logo()
 

@@ -50,7 +50,7 @@ def setup_logging(verbose: bool = False, quiet: bool = False) -> None:
     if HAS_RICH:
         try:
             from structlog.dev import ConsoleRenderer
-            processors.append(ConsoleRenderer(pad_event_to=40))
+            processors.append(ConsoleRenderer(pad_event=40))
         except ImportError:
             processors.append(structlog.processors.JSONRenderer())
     else:
