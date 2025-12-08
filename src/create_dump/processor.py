@@ -25,6 +25,12 @@ from .logging import (
     HAS_RICH, Progress, SpinnerColumn, TextColumn, console, logger
 )
 from .metrics import FILES_PROCESSED, ERRORS_TOTAL
+
+# ⚡ NEW: Type Alias for Progress
+if HAS_RICH:
+    ProgressType = Progress  # type: ignore
+else:
+    ProgressType = Any  # type: ignore
 from .system import DEFAULT_MAX_WORKERS
 
 
@@ -143,9 +149,9 @@ class FileProcessor:
         self.files = [] # Ensure list is fresh for this run
 
         async def _process_wrapper(
-            file_path: str, 
-            prog: Optional[Progress] = None, 
-            task_id: Optional[TaskStatus] = None
+            file_path: str,
+            prog: Optional[ProgressType] = None,
+            task_id: Optional[Any] = None,
         ):
             """Wrapper to handle timeouts, limiting, and progress bar."""
             async with limiter:

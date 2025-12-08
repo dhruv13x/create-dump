@@ -101,10 +101,12 @@ async def _run_async_cmd(cmd: List[str], cwd: Path) -> Tuple[str, str, int]:
 
     stdout_bytes, stderr_bytes = await proc.communicate()
 
+    # If proc.returncode is None, we assume 0 or handle it.
+    # communicate() ensures process is done, so returncode should be set.
     return (
         stdout_bytes.decode().strip(),
         stderr_bytes.decode().strip(),
-        proc.returncode,
+        proc.returncode if proc.returncode is not None else -1,
     )
 
 

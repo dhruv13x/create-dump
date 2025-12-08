@@ -153,7 +153,7 @@ class MarkdownWriter:
 
     async def _render_tree_level(
         self,
-        out_stream: anyio.abc.Stream,
+        out_stream: Any,
         level_dict: dict,
         prefix: str = "",
     ):

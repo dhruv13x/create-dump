@@ -23,8 +23,8 @@ from .git_diff import GitDiffCollector
 
 def get_collector(
     config: Config,
-    includes: List[str] = None,
-    excludes: List[str] = None,
+    includes: Optional[List[str]] = None,
+    excludes: Optional[List[str]] = None,
     use_gitignore: bool = False,
     root: Path = Path("."),
     # ⚡ NEW: v8 feature flags
@@ -46,14 +46,14 @@ def get_collector(
 
     if diff_since:
         logger.debug("Using GitDiffCollector strategy.")
-        return GitDiffCollector(diff_since=diff_since, **common_args)
-    
+        return GitDiffCollector(diff_since=diff_since, **common_args)  # type: ignore
+
     if git_ls_files:
         logger.debug("Using GitLsCollector strategy.")
-        return GitLsCollector(**common_args)
-    
+        return GitLsCollector(**common_args)  # type: ignore
+
     logger.debug("Using WalkCollector (default) strategy.")
-    return WalkCollector(**common_args)
+    return WalkCollector(**common_args)  # type: ignore
 
 # ⚡ NEW: Make strategies importable from the package
 __all__ = [
