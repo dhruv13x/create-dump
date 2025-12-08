@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import logging
 import re
+from typing import Any
 import structlog
 
 # Rich
@@ -16,7 +17,7 @@ SpinnerColumn = None
 TextColumn = None
 try:
     from rich.console import Console
-    from rich.progress import Progress, SpinnerColumn, TextColumn
+    from rich.progress import Progress, SpinnerColumn, TextColumn  # type: ignore
 
     console = Console()
     HAS_RICH = True
@@ -40,7 +41,7 @@ def styled_print(text: str, nl: bool = True, **kwargs) -> None:
 def setup_logging(verbose: bool = False, quiet: bool = False) -> None:
     """Configure structured logging once."""
     level = "DEBUG" if verbose else "WARNING" if quiet else "INFO"
-    processors = [
+    processors: list[Any] = [
         structlog.processors.TimeStamper(fmt="iso"),
         structlog.stdlib.add_log_level,
         structlog.stdlib.PositionalArgumentsFormatter(),

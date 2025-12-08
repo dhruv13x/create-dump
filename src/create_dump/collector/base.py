@@ -24,8 +24,8 @@ class CollectorBase(ABC):
     def __init__(
         self,
         config: Config,
-        includes: List[str] = None,
-        excludes: List[str] = None,
+        includes: Optional[List[str]] = None,
+        excludes: Optional[List[str]] = None,
         use_gitignore: bool = False,
         root: Path = Path("."),
     ):

@@ -91,7 +91,7 @@ class ArchivePackager:
 
             else:  # Handle 'tar.gz' and 'tar.bz2'
                 tar_mode = "w:gz" if self.archive_format == "tar.gz" else "w:bz2"
-                with tarfile.open(archive_name, tar_mode) as tar:
+                with tarfile.open(name=str(archive_name), mode=tar_mode) as tar:  # type: ignore
                     for p in to_archive:
                         arcname = _safe_arcname(p, self.root)
                         tar.add(p, arcname=arcname)

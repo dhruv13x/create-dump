@@ -89,9 +89,9 @@ def run(
         $ create-dump batch run src/ --dest central/ --dirs api,web -c -y -nd  # Real batch to central dir
     """
     # 1. Get flags from all 3 levels
-    parent_params = ctx.parent.params
+    parent_params = ctx.parent.params if ctx.parent else {}
     main_params = ctx.find_root().params
-    
+
     # 2. Resolve dry_run (safe by default)
     # Start with the batch-level default
     effective_dry_run = parent_params.get('dry_run', True)
@@ -122,7 +122,7 @@ def run(
     
     # 5. Call async function
     anyio.run(
-        run_batch,
+        run_batch,  # type: ignore
         root,
         subdirs,
         pattern,
@@ -167,7 +167,7 @@ def clean(
         $ create-dump batch clean . '.*old_dump.*' -y -nd -v  # Real verbose cleanup
     """
     # 1. Get flags from all 3 levels
-    parent_params = ctx.parent.params
+    parent_params = ctx.parent.params if ctx.parent else {}
     main_params = ctx.find_root().params
 
     # 2. Resolve dry_run
@@ -231,7 +231,7 @@ def archive(
         $ create-dump batch archive monorepo/ '.*custom' --archive-all -y -v  # Grouped archive, verbose, skip prompts
     """
     # 1. Get flags from all 3 levels
-    parent_params = ctx.parent.params
+    parent_params = ctx.parent.params if ctx.parent else {}
     main_params = ctx.find_root().params
     
     # Get archive_format from root

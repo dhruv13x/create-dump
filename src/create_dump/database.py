@@ -66,7 +66,6 @@ class DatabaseDumper:
             return DumpFile(
                 path="database.sql",
                 content=content,
-                size=len(content)
             )
         except Exception as e:
              logger.error(f"Database dump failed: {e}")
