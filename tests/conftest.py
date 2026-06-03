@@ -14,7 +14,12 @@ from pathlib import Path
 from typing import Dict, Callable, Awaitable
 
 import anyio
+import click.testing
 from typer.testing import CliRunner
+
+# Monkeypatch typer.testing.CliRunner to add isolated_filesystem (removed in newer Typer versions)
+if not hasattr(CliRunner, "isolated_filesystem"):
+    CliRunner.isolated_filesystem = click.testing.CliRunner.isolated_filesystem
 
 from create_dump.core import Config
 from create_dump.cli.main import app as cli_app

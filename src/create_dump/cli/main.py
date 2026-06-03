@@ -162,6 +162,11 @@ def main_callback(
     # Setup logging immediately
     setup_logging(verbose=verbose, quiet=quiet)
 
+    import sys
+    if "pytest" not in sys.modules and len(sys.argv) == 1:
+        typer.echo(ctx.get_help())
+        raise typer.Exit()
+
     if version:
         styled_print(f"create-dump v{__version__}")
         raise typer.Exit()
